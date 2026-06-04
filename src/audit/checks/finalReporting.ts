@@ -1,17 +1,25 @@
 import type { ContextIssue } from '../../types.js'
 
-const REPORTING_PATTERNS = [
-  /final\s+report/i,
-  /\bsummary\b/i,
+const STRONG_SECTION_PATTERNS = [
+  /#+\s*final\s+report/i,
+  /#+\s*completion\s+report/i,
+  /#+\s*handoff/i,
+]
+
+const STRONG_FIELD_PATTERNS = [
   /files\s+changed/i,
   /commands\s+run/i,
-  /\btests\b/i,
+  /tests\s+(added|updated|run|result|results)/i,
   /known\s+limitations/i,
+  /recommended\s+next\s+steps?/i,
 ]
 
 export function checkFinalReporting(filePath: string, content: string): ContextIssue[] {
-  const hasReporting = REPORTING_PATTERNS.some((p) => p.test(content))
-  if (hasReporting) return []
+  const hasStrongSection = STRONG_SECTION_PATTERNS.some((p) => p.test(content))
+  if (hasStrongSection) return []
+
+  const matchedFields = STRONG_FIELD_PATTERNS.filter((p) => p.test(content))
+  if (matchedFields.length >= 2) return []
 
   return [
     {

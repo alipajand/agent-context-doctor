@@ -1,10 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { VERSION } from '../src/version.js'
 
 const DIST_CLI = path.resolve('dist/cli.js')
 const hasDist = existsSync(DIST_CLI)
+
+describe('version constant', () => {
+  it('package.json version matches VERSION constant', async () => {
+    const raw = await readFile(path.resolve('package.json'), 'utf-8')
+    const pkg = JSON.parse(raw) as { version: string }
+    expect(pkg.version).toBe(VERSION)
+  })
+})
 
 // These tests only run after `pnpm build`. They are skipped when dist/ is absent
 // so the main `pnpm test` pass (which runs before build in CI) is unaffected.
@@ -13,6 +23,11 @@ describe.skipIf(!hasDist)('CLI smoke tests (requires built dist/)', () => {
     const result = spawnSync('node', [DIST_CLI, '--version'], { encoding: 'utf-8' })
     expect(result.status).toBe(0)
     expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/)
+  })
+
+  it('--version output matches VERSION constant', () => {
+    const result = spawnSync('node', [DIST_CLI, '--version'], { encoding: 'utf-8' })
+    expect(result.stdout.trim()).toBe(VERSION)
   })
 
   it('audit --help exits 0 and mentions "audit"', () => {

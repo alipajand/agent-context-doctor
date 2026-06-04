@@ -10,6 +10,7 @@ import { writeReport } from './fs/writeReport.js'
 import { loadConfig } from './config/loadConfig.js'
 import { initRepo } from './init/initRepo.js'
 import { AGENTS_TEMPLATE } from './init/template.js'
+import { VERSION } from './version.js'
 import type { Severity } from './types.js'
 
 const SEVERITY_ORDER: Record<Severity, number> = {
@@ -28,7 +29,7 @@ const program = new Command()
 program
   .name('acd')
   .description('Audit repository agent context files for quality, safety, and completeness.')
-  .version('0.1.0')
+  .version(VERSION)
 
 program
   .command('audit [repoPath]')

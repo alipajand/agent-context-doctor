@@ -140,6 +140,8 @@ Evidence snippets are short local extracts from the audited files — nothing is
 
 The `examples/` directory contains ready-to-run fixtures to demonstrate the difference between a well-written and a poorly-written agent context file.
 
+These example fixtures are available in the GitHub repository. Clone the repo before running these commands.
+
 **Audit the bad example** — expect many issues:
 
 ```bash
