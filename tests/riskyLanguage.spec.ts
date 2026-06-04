@@ -58,4 +58,24 @@ describe('checkRiskyLanguage', () => {
     const issues = checkRiskyLanguage('AGENTS.md', 'line1\nline2\nskip tests\nline4')
     expect(issues[0].line).toBe(3)
   })
+
+  it('does not flag "do not skip tests"', () => {
+    const issues = checkRiskyLanguage('AGENTS.md', 'Do not skip tests without approval.')
+    expect(issues.filter((i) => i.message.includes('skip tests'))).toHaveLength(0)
+  })
+
+  it('does not flag "do not commit secrets"', () => {
+    const issues = checkRiskyLanguage('AGENTS.md', 'Do not commit secrets or credentials.')
+    expect(issues.filter((i) => i.message.includes('commit secrets'))).toHaveLength(0)
+  })
+
+  it('does not flag "do not disable tests"', () => {
+    const issues = checkRiskyLanguage('AGENTS.md', 'Do not disable tests or skip CI checks.')
+    expect(issues.filter((i) => i.message.includes('disable tests'))).toHaveLength(0)
+  })
+
+  it('does not flag "do not bypass auth"', () => {
+    const issues = checkRiskyLanguage('AGENTS.md', 'Do not bypass auth mechanisms.')
+    expect(issues.filter((i) => i.message.includes('bypass auth'))).toHaveLength(0)
+  })
 })

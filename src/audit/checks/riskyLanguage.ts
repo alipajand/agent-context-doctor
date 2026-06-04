@@ -1,14 +1,16 @@
 import type { ContextIssue } from '../../types.js'
 
+// Negative lookbehind `(?<!not\s)` prevents matching phrases that appear in
+// "do not X" negations — e.g. "Do not commit secrets" should not be flagged.
 const HIGH_RISK_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
-  { pattern: /skip\s+tests/i, label: 'skip tests' },
-  { pattern: /ignore\s+failing\s+tests/i, label: 'ignore failing tests' },
-  { pattern: /disable\s+tests/i, label: 'disable tests' },
-  { pattern: /bypass\s+auth/i, label: 'bypass auth' },
-  { pattern: /disable\s+auth/i, label: 'disable auth' },
-  { pattern: /ignore\s+security/i, label: 'ignore security' },
-  { pattern: /commit\s+secrets/i, label: 'commit secrets' },
-  { pattern: /hardcode\s+api\s+key/i, label: 'hardcode api key' },
+  { pattern: /(?<!not\s)skip\s+tests/i, label: 'skip tests' },
+  { pattern: /(?<!not\s)ignore\s+failing\s+tests/i, label: 'ignore failing tests' },
+  { pattern: /(?<!not\s)disable\s+tests/i, label: 'disable tests' },
+  { pattern: /(?<!not\s)bypass\s+auth/i, label: 'bypass auth' },
+  { pattern: /(?<!not\s)disable\s+auth/i, label: 'disable auth' },
+  { pattern: /(?<!not\s)ignore\s+security/i, label: 'ignore security' },
+  { pattern: /(?<!not\s)commit\s+secrets/i, label: 'commit secrets' },
+  { pattern: /(?<!not\s)hardcode\s+api\s+key/i, label: 'hardcode api key' },
 ]
 
 const MEDIUM_RISK_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
