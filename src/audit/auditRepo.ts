@@ -9,6 +9,7 @@ import {
   checkCommandAlignment,
   checkCommandsWithoutPackageJson,
 } from './checks/commandAlignment.js'
+import { checkContradictions } from './checks/contradictions.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
 import type { AuditResult, ContextIssue } from '../types.js'
@@ -32,9 +33,13 @@ export async function auditRepo(repoPath: string): Promise<AuditResult> {
     })
   }
 
+  const fileContents: Array<{ path: string; content: string }> = []
+
   for (const ctxFile of contextFiles) {
     const absolutePath = path.resolve(absoluteRepo, ctxFile.path)
     const content = await readTextFile(absolutePath)
+
+    fileContents.push({ path: ctxFile.path, content })
 
     const placeholderIssues = checkPlaceholderContent(ctxFile.path, content)
     issues.push(...placeholderIssues)
@@ -61,6 +66,10 @@ export async function auditRepo(repoPath: string): Promise<AuditResult> {
       issues.push(...reportingIssues)
     }
   }
+
+  // Cross-file contradiction check runs after all files are collected
+  const contradictionIssues = checkContradictions(fileContents)
+  issues.push(...contradictionIssues)
 
   const high = issues.filter((i) => i.severity === 'high').length
   const medium = issues.filter((i) => i.severity === 'medium').length
