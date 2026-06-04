@@ -5,12 +5,18 @@ import { checkSafetyBoundaries } from './checks/safetyBoundaries.js'
 import { checkValidationCommands } from './checks/validationCommands.js'
 import { checkFinalReporting } from './checks/finalReporting.js'
 import { checkRiskyLanguage } from './checks/riskyLanguage.js'
+import {
+  checkCommandAlignment,
+  checkCommandsWithoutPackageJson,
+} from './checks/commandAlignment.js'
 import { readTextFile } from '../fs/readTextFile.js'
+import { readPackageScripts } from '../fs/readPackageJson.js'
 import type { AuditResult, ContextIssue } from '../types.js'
 
 export async function auditRepo(repoPath: string): Promise<AuditResult> {
   const absoluteRepo = path.resolve(repoPath)
   const contextFiles = await detectContextFiles(absoluteRepo)
+  const packageScripts = await readPackageScripts(absoluteRepo)
 
   const issues: ContextIssue[] = []
 
@@ -35,6 +41,14 @@ export async function auditRepo(repoPath: string): Promise<AuditResult> {
 
     const riskyIssues = checkRiskyLanguage(ctxFile.path, content)
     issues.push(...riskyIssues)
+
+    if (packageScripts !== null) {
+      const cmdIssues = checkCommandAlignment(ctxFile.path, content, packageScripts)
+      issues.push(...cmdIssues)
+    } else {
+      const noPkgIssues = checkCommandsWithoutPackageJson(ctxFile.path, content)
+      issues.push(...noPkgIssues)
+    }
 
     if (isPrimaryInstructionFile(ctxFile.path)) {
       const safetyIssues = checkSafetyBoundaries(ctxFile.path, content)
