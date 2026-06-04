@@ -125,6 +125,21 @@ describe('checkCommandAlignment', () => {
     expect(issues[0].recommendation).toContain('validate')
   })
 
+  it('includes evidence containing the referenced command', () => {
+    const issues = checkCommandAlignment('AGENTS.md', 'Run `pnpm validate` before merging', {
+      test: 'jest',
+    })
+    expect(issues[0].evidence).toBeDefined()
+    expect(issues[0].evidence).toContain('pnpm validate')
+  })
+
+  it('evidence reflects the full line content trimmed', () => {
+    const issues = checkCommandAlignment('AGENTS.md', 'line1\n  pnpm run deploy  \nline3', {
+      test: 'jest',
+    })
+    expect(issues[0].evidence).toBe('pnpm run deploy')
+  })
+
   it('no issues when all mentioned scripts exist', () => {
     const issues = checkCommandAlignment(
       'AGENTS.md',

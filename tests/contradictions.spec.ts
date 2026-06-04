@@ -115,6 +115,49 @@ describe('checkContradictions', () => {
     expect(issue?.file).toBe('multiple')
   })
 
+  it('includes files array on every contradiction issue', () => {
+    const issues = checkContradictions([
+      {
+        path: 'AGENTS.md',
+        content: 'Tests must pass before finishing.\nYou can skip tests if slow.',
+      },
+    ])
+    const issue = issues.find((i) => i.id === 'contradiction-tests')
+    expect(issue?.files).toBeDefined()
+    expect(issue?.files).toContain('AGENTS.md')
+  })
+
+  it('includes files from both involved files in cross-file contradiction', () => {
+    const issues = checkContradictions([
+      { path: 'AGENTS.md', content: 'Ask before auth changes. Do not change authentication.' },
+      { path: '.cursorrules', content: 'You may bypass auth in dev mode.' },
+    ])
+    const issue = issues.find((i) => i.id === 'contradiction-security')
+    expect(issue?.files).toContain('AGENTS.md')
+    expect(issue?.files).toContain('.cursorrules')
+  })
+
+  it('includes human-readable evidence with file and phrase context', () => {
+    const issues = checkContradictions([
+      { path: 'AGENTS.md', content: 'Tests must pass. Skip tests if slow.' },
+    ])
+    const issue = issues.find((i) => i.id === 'contradiction-tests')
+    expect(issue?.evidence).toBeDefined()
+    expect(issue?.evidence).toContain('AGENTS.md')
+    expect(issue?.evidence).toContain('"')
+    expect(issue?.evidence).toContain('vs')
+  })
+
+  it('cross-file contradiction evidence references both file names', () => {
+    const issues = checkContradictions([
+      { path: 'AGENTS.md', content: 'Minimal diff. Avoid unrelated refactors.' },
+      { path: '.cursorrules', content: 'Refactor everything.' },
+    ])
+    const issue = issues.find((i) => i.id === 'contradiction-refactors')
+    expect(issue?.evidence).toContain('AGENTS.md')
+    expect(issue?.evidence).toContain('.cursorrules')
+  })
+
   it('detects same-file security contradiction', () => {
     const issues = checkContradictions([
       {

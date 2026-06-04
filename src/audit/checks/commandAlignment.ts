@@ -1,5 +1,6 @@
 import type { ContextIssue } from '../../types.js'
 import type { PackageJsonScripts } from '../../fs/readPackageJson.js'
+import { getLineEvidence } from '../evidence.js'
 
 const PACKAGE_MANAGERS = ['pnpm', 'npm', 'yarn', 'bun']
 
@@ -91,6 +92,7 @@ export function checkCommandAlignment(
         category: 'command-alignment',
         file: filePath,
         line: cmd.line,
+        evidence: getLineEvidence(content, cmd.line),
         message: `Instruction references missing package script: "${cmd.script}"`,
         recommendation: `Update the instruction file or add package.json script "${cmd.script}".`,
       })

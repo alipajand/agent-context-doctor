@@ -137,6 +137,27 @@ describe('toMarkdownReport', () => {
     const md = toMarkdownReport(noFilesResult)
     expect(md).toContain('_No context files detected._')
   })
+
+  it('includes Evidence: line in recommendations section when evidence is present', () => {
+    const resultWithEvidence: AuditResult = {
+      ...sampleResult,
+      issues: [
+        {
+          ...sampleResult.issues[0],
+          evidence: 'skip tests if the suite is too slow',
+        },
+        ...sampleResult.issues.slice(1),
+      ],
+    }
+    const md = toMarkdownReport(resultWithEvidence)
+    expect(md).toContain('Evidence:')
+    expect(md).toContain('skip tests if the suite is too slow')
+  })
+
+  it('does not include Evidence: line when evidence is absent', () => {
+    const md = toMarkdownReport(sampleResult)
+    expect(md).not.toContain('Evidence:')
+  })
 })
 
 describe('toJsonReport', () => {

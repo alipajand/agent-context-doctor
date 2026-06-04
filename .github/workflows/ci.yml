@@ -46,4 +46,10 @@ jobs:
         run: pnpm build
 
       - name: Smoke test binary
-        run: node dist/cli.js --version
+        run: |
+          node dist/cli.js --version
+          node dist/cli.js audit --help
+          node dist/cli.js audit examples/good-context
+
+      - name: Verify pack contents
+        run: pnpm pack --dry-run

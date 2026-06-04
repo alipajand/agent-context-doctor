@@ -13,6 +13,11 @@ import { checkContradictions } from './checks/contradictions.js'
 import { computeScore } from './score.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
+import {
+  filterSuppressedIssues,
+  parseSuppressions,
+  KNOWN_SUPPRESSION_CATEGORIES,
+} from './suppressions.js'
 import type { AuditResult, ContextIssue } from '../types.js'
 
 export type AuditOptions = {
@@ -51,12 +56,14 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
 
     fileContents.push({ path: ctxFile.path, content })
 
+    const fileIssues: ContextIssue[] = []
+
     if (!disabled.has('placeholder-content')) {
-      issues.push(...checkPlaceholderContent(ctxFile.path, content))
+      fileIssues.push(...checkPlaceholderContent(ctxFile.path, content))
     }
 
     if (!disabled.has('risky-language')) {
-      issues.push(...checkRiskyLanguage(ctxFile.path, content))
+      fileIssues.push(...checkRiskyLanguage(ctxFile.path, content))
     }
 
     if (!disabled.has('command-alignment')) {
@@ -67,28 +74,59 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
             return !scriptMatch || !allowedScripts.has(scriptMatch[1])
           },
         )
-        issues.push(...cmdIssues)
+        fileIssues.push(...cmdIssues)
       } else {
-        issues.push(...checkCommandsWithoutPackageJson(ctxFile.path, content))
+        fileIssues.push(...checkCommandsWithoutPackageJson(ctxFile.path, content))
       }
     }
 
     if (isPrimaryInstructionFile(ctxFile.path)) {
       if (!disabled.has('safety-boundaries')) {
-        issues.push(...checkSafetyBoundaries(ctxFile.path, content))
+        fileIssues.push(...checkSafetyBoundaries(ctxFile.path, content))
       }
       if (!disabled.has('validation-commands')) {
-        issues.push(...checkValidationCommands(ctxFile.path, content))
+        fileIssues.push(...checkValidationCommands(ctxFile.path, content))
       }
       if (!disabled.has('final-reporting')) {
-        issues.push(...checkFinalReporting(ctxFile.path, content))
+        fileIssues.push(...checkFinalReporting(ctxFile.path, content))
       }
     }
+
+    issues.push(...filterSuppressedIssues(ctxFile.path, content, fileIssues))
   }
 
   // Cross-file contradiction check runs after all files are collected
   if (!disabled.has('contradictions')) {
-    issues.push(...checkContradictions(fileContents))
+    const contradictionIssues = checkContradictions(fileContents)
+    const fileSuppressionRules = new Map(
+      fileContents.map((fc) => [fc.path, parseSuppressions(fc.content)]),
+    )
+
+    for (const issue of contradictionIssues) {
+      const involvedFiles =
+        issue.files && issue.files.length > 0
+          ? issue.files
+          : issue.file !== 'multiple'
+            ? [issue.file]
+            : []
+
+      if (involvedFiles.length === 0) {
+        issues.push(issue)
+        continue
+      }
+
+      const allSuppressed = involvedFiles.every((f) => {
+        const rules = fileSuppressionRules.get(f) ?? []
+        return rules.some(
+          (r) =>
+            r.kind === 'file' &&
+            r.category === issue.category &&
+            KNOWN_SUPPRESSION_CATEGORIES.has(r.category),
+        )
+      })
+
+      if (!allSuppressed) issues.push(issue)
+    }
   }
 
   const high = issues.filter((i) => i.severity === 'high').length

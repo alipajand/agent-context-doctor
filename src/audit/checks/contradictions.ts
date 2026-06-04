@@ -106,19 +106,24 @@ export function checkContradictions(files: FileContent[]): ContextIssue[] {
 
     if (strictMatches.length === 0 || opposingMatches.length === 0) continue
 
-    const strictExample = strictMatches[0].phrase
-    const opposingExample = opposingMatches[0].phrase
+    const strictMatch = strictMatches[0]
+    const opposingMatch = opposingMatches[0]
+    const strictExample = strictMatch.phrase
+    const opposingExample = opposingMatch.phrase
     const involvedFiles = [
       ...new Set([...strictMatches.map((m) => m.file), ...opposingMatches.map((m) => m.file)]),
     ]
 
     const fileLabel = involvedFiles.length > 1 ? 'multiple' : involvedFiles[0]
+    const evidence = `${strictMatch.file}: "${strictExample}" vs ${opposingMatch.file}: "${opposingExample}"`
 
     issues.push({
       id: `contradiction-${group.name}`,
       severity: group.severity,
       category: 'contradictions',
       file: fileLabel,
+      files: involvedFiles,
+      evidence,
       message: `Contradictory agent instructions detected: ${group.name}`,
       recommendation:
         `Remove one side of the contradiction so agents receive a single clear rule. ` +

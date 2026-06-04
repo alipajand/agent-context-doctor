@@ -8,6 +8,8 @@ import { toJsonReport } from './report/jsonReport.js'
 import { toMarkdownReport } from './report/markdownReport.js'
 import { writeReport } from './fs/writeReport.js'
 import { loadConfig } from './config/loadConfig.js'
+import { initRepo } from './init/initRepo.js'
+import { AGENTS_TEMPLATE } from './init/template.js'
 import type { Severity } from './types.js'
 
 const SEVERITY_ORDER: Record<Severity, number> = {
@@ -123,6 +125,28 @@ program
         console.log(`  ${f.path}  [${f.kind}]  ${f.bytes}B`)
       }
     }
+  })
+
+program
+  .command('init [repoPath]')
+  .description('Create a starter AGENTS.md in the repository')
+  .option('--force', 'Overwrite an existing AGENTS.md')
+  .option('--print', 'Print the template to stdout without writing any files')
+  .action(async (cliRepoPath: string | undefined, opts: { force?: boolean; print?: boolean }) => {
+    if (opts.print) {
+      process.stdout.write(AGENTS_TEMPLATE)
+      return
+    }
+
+    const result = await initRepo(cliRepoPath ?? process.cwd(), { force: opts.force })
+
+    if (result.status === 'already-exists') {
+      process.stderr.write('AGENTS.md already exists. Use --force to overwrite.\n')
+      process.exit(1)
+    }
+
+    const verb = result.status === 'created' ? 'Created' : 'Overwrote'
+    process.stderr.write(`${verb} ${result.path}\n`)
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {

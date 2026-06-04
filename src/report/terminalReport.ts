@@ -61,6 +61,9 @@ export function printTerminalReport(result: AuditResult): void {
       const fileRef = issue.file !== result.repoPath ? `${issue.file}${loc}` : issue.file
       console.log(`  ${severityColor(issue.severity)} ${fileRef} — ${issue.message}`)
       console.log(`    ${pc.dim('Recommendation:')} ${issue.recommendation}`)
+      if (issue.evidence) {
+        console.log(`    ${pc.dim('Evidence:')} ${issue.evidence}`)
+      }
     }
   } else {
     console.log()

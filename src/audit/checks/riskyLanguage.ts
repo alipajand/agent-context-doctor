@@ -1,4 +1,5 @@
 import type { ContextIssue } from '../../types.js'
+import { getLineEvidence } from '../evidence.js'
 
 // Negative lookbehind `(?<!not\s)` prevents matching phrases that appear in
 // "do not X" negations — e.g. "Do not commit secrets" should not be flagged.
@@ -35,6 +36,7 @@ export function checkRiskyLanguage(filePath: string, content: string): ContextIs
           category: 'risky-language',
           file: filePath,
           line: idx + 1,
+          evidence: getLineEvidence(content, idx + 1),
           message: `Risky instruction: "${label}"`,
           recommendation:
             'Remove language that lets agents bypass validation, security, or testing. Agents should never skip tests, bypass auth, or commit secrets.',
@@ -52,6 +54,7 @@ export function checkRiskyLanguage(filePath: string, content: string): ContextIs
           category: 'risky-language',
           file: filePath,
           line: idx + 1,
+          evidence: getLineEvidence(content, idx + 1),
           message: `Risky instruction: "${label}"`,
           recommendation:
             'Avoid open-ended instructions that let agents make large unscoped changes. Be specific about what is in and out of scope.',

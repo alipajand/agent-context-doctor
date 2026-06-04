@@ -8,6 +8,9 @@ export type ContextIssue = {
   message: string
   recommendation: string
   line?: number
+  endLine?: number
+  evidence?: string
+  files?: string[]
 }
 
 export type ContextFileKind =

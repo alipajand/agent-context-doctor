@@ -1,0 +1,12 @@
+# Project Rules
+
+## Code Quality
+
+Minimal diff — avoid unrelated refactors and scope creep at all times.
+
+Always run tests before finishing any task. Tests must pass before you consider work complete.
+
+## Safety
+
+Ask before changing auth or security-sensitive code.
+Do not change database schemas without approval.

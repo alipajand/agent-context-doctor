@@ -78,4 +78,30 @@ describe('checkRiskyLanguage', () => {
     const issues = checkRiskyLanguage('AGENTS.md', 'Do not bypass auth mechanisms.')
     expect(issues.filter((i) => i.message.includes('bypass auth'))).toHaveLength(0)
   })
+
+  it('includes evidence for a high-severity match', () => {
+    const issues = checkRiskyLanguage('AGENTS.md', 'You can skip tests if they are slow.')
+    expect(issues[0].evidence).toBeDefined()
+    expect(issues[0].evidence).toContain('skip tests')
+  })
+
+  it('evidence is trimmed and contains the matched line content', () => {
+    const issues = checkRiskyLanguage('AGENTS.md', '  bypass auth when needed  ')
+    expect(issues[0].evidence).toBe('bypass auth when needed')
+  })
+
+  it('evidence is capped at 160 characters', () => {
+    const longLine = 'bypass auth ' + 'x'.repeat(200)
+    const issues = checkRiskyLanguage('AGENTS.md', longLine)
+    expect(issues[0].evidence!.length).toBeLessThanOrEqual(160)
+  })
+
+  it('includes evidence for a medium-severity match', () => {
+    const issues = checkRiskyLanguage(
+      'AGENTS.md',
+      'Feel free to refactor everything in the codebase.',
+    )
+    expect(issues[0].evidence).toBeDefined()
+    expect(issues[0].evidence).toContain('refactor everything')
+  })
 })

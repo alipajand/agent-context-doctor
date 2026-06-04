@@ -1,4 +1,5 @@
 import type { ContextIssue } from '../../types.js'
+import { getLineEvidence } from '../evidence.js'
 
 const TEMPLATE_MARKERS = [
   /\bTODO\b/i,
@@ -33,6 +34,7 @@ export function checkPlaceholderContent(filePath: string, content: string): Cont
           category: 'placeholder-content',
           file: filePath,
           line: idx + 1,
+          evidence: getLineEvidence(content, idx + 1),
           message: `Placeholder content detected: "${line.trim().slice(0, 80)}"`,
           recommendation: 'Replace placeholder content with real, project-specific instructions.',
         })
@@ -52,6 +54,7 @@ export function checkPlaceholderContent(filePath: string, content: string): Cont
           category: 'placeholder-content',
           file: filePath,
           line: lineIdx >= 0 ? lineIdx + 1 : undefined,
+          evidence: lineIdx >= 0 ? getLineEvidence(content, lineIdx + 1) : undefined,
           message: `Template section "${label}" appears unfilled`,
           recommendation:
             'Fill in the scope section with actual project-specific scope boundaries.',

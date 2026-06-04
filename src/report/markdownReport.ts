@@ -76,6 +76,9 @@ export function toMarkdownReport(result: AuditResult): string {
       const loc = issue.line ? `:${issue.line}` : ''
       lines.push(`- **\`${issue.file}${loc}\`** — ${issue.message}`)
       lines.push(`  - ${issue.recommendation}`)
+      if (issue.evidence) {
+        lines.push(`  - Evidence: \`${escapeMarkdown(issue.evidence)}\``)
+      }
     }
     lines.push('')
   }

@@ -1,0 +1,10 @@
+{
+  "audit": {
+    "failOn": "high",
+    "output": "docs/agent-context-report.md"
+  },
+  "rules": {
+    "ignoreFiles": ["prompts/archive/**"],
+    "allowedMissingScripts": ["validate"]
+  }
+}
