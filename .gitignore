@@ -1,0 +1,6 @@
+node_modules/
+dist/
+coverage/
+docs/agent-context-report.md
+*.tsbuildinfo
+.DS_Store
