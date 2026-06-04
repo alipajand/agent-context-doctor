@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Bug report
+    url: https://github.com/alipajand/agent-context-doctor/issues/new?template=bug_report.md
+    about: Report a bug or unexpected behavior
+  - name: Feature request
+    url: https://github.com/alipajand/agent-context-doctor/issues/new?template=feature_request.md
+    about: Suggest an improvement
+  - name: Security vulnerability
+    url: https://github.com/alipajand/agent-context-doctor/security/advisories/new
+    about: Report a security issue privately — do not open a public issue

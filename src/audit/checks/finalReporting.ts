@@ -9,10 +9,7 @@ const REPORTING_PATTERNS = [
   /known\s+limitations/i,
 ]
 
-export function checkFinalReporting(
-  filePath: string,
-  content: string,
-): ContextIssue[] {
+export function checkFinalReporting(filePath: string, content: string): ContextIssue[] {
   const hasReporting = REPORTING_PATTERNS.some((p) => p.test(content))
   if (hasReporting) return []
 

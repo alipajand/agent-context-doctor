@@ -20,10 +20,7 @@ function looksLikeBlankTemplate(content: string, matchLine: string): boolean {
   return trimmed === '' || trimmed === '*' || trimmed === '-' || trimmed.length < 5
 }
 
-export function checkPlaceholderContent(
-  filePath: string,
-  content: string,
-): ContextIssue[] {
+export function checkPlaceholderContent(filePath: string, content: string): ContextIssue[] {
   const issues: ContextIssue[] = []
   const lines = content.split('\n')
 
@@ -37,8 +34,7 @@ export function checkPlaceholderContent(
           file: filePath,
           line: idx + 1,
           message: `Placeholder content detected: "${line.trim().slice(0, 80)}"`,
-          recommendation:
-            'Replace placeholder content with real, project-specific instructions.',
+          recommendation: 'Replace placeholder content with real, project-specific instructions.',
         })
       }
     })

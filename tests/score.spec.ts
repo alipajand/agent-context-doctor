@@ -41,11 +41,7 @@ describe('computeScore', () => {
 
   it('mixed severities calculate correctly', () => {
     // 1 high (-20) + 2 medium (-16) + 1 low (-3) = -39 → 61
-    const issues = [
-      ...makeIssue('high', 1),
-      ...makeIssue('medium', 2),
-      ...makeIssue('low', 1),
-    ]
+    const issues = [...makeIssue('high', 1), ...makeIssue('medium', 2), ...makeIssue('low', 1)]
     const score = computeScore(issues)
     expect(score.total).toBe(61)
     expect(score.grade).toBe('needs-work')

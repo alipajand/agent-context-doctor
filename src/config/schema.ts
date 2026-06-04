@@ -22,9 +22,7 @@ export const AcdRcSchema = z.object({
   rules: z
     .object({
       ignoreFiles: z.array(z.string()).optional(),
-      disabledChecks: z
-        .array(z.enum(VALID_CHECKS))
-        .optional(),
+      disabledChecks: z.array(z.enum(VALID_CHECKS)).optional(),
       allowedMissingScripts: z.array(z.string()).optional(),
     })
     .optional(),

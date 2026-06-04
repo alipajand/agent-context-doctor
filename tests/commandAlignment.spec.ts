@@ -113,11 +113,9 @@ describe('checkCommandAlignment', () => {
   })
 
   it('includes line number and file in issue', () => {
-    const issues = checkCommandAlignment(
-      'AGENTS.md',
-      'line1\npnpm run deploy\nline3',
-      { test: 'vitest' },
-    )
+    const issues = checkCommandAlignment('AGENTS.md', 'line1\npnpm run deploy\nline3', {
+      test: 'vitest',
+    })
     expect(issues[0].file).toBe('AGENTS.md')
     expect(issues[0].line).toBe(2)
   })
@@ -141,10 +139,7 @@ describe('checkCommandAlignment', () => {
 
 describe('checkCommandsWithoutPackageJson', () => {
   it('creates a low issue when package manager commands are present but no package.json', () => {
-    const issues = checkCommandsWithoutPackageJson(
-      'AGENTS.md',
-      'Run `pnpm test` to verify.',
-    )
+    const issues = checkCommandsWithoutPackageJson('AGENTS.md', 'Run `pnpm test` to verify.')
     expect(issues).toHaveLength(1)
     expect(issues[0].severity).toBe('low')
     expect(issues[0].category).toBe('command-alignment')

@@ -1,0 +1,44 @@
+---
+description: Project rules for agent-context-doctor
+globs: ["src/**", "tests/**"]
+alwaysApply: true
+---
+
+# agent-context-doctor — Cursor Rules
+
+You are an **implementation agent** for this project. Focus on implementation only — product strategy is out of scope.
+
+## Hard rules
+
+- No LLM calls, no telemetry, no external network requests
+- No authentication or credential handling
+- No web server or browser UI
+- Do not rename `acd`, `audit`, or `list` commands
+- Do not break the `AuditResult` JSON shape or `.acdrc` schema backward compatibility
+
+## Before finishing any task
+
+Run and confirm these all pass:
+
+```bash
+pnpm format:check
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+## Code style
+
+- TypeScript strict mode — no `any`, no `ts-ignore`
+- Pure functions for all audit checks in `src/audit/checks/`
+- Tests in `tests/*.spec.ts` using vitest
+- No comments that narrate what the code does
+
+## Final report format
+
+Always return:
+
+- Files changed (list)
+- Commands run and their output
+- Tests added
+- Known limitations

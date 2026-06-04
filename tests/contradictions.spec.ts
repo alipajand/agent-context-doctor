@@ -131,8 +131,7 @@ describe('checkContradictions', () => {
     const issues = checkContradictions([
       {
         path: 'AGENTS.md',
-        content:
-          'Tests must pass.\nSkip tests if slow.\nMinimal diff.\nRefactor everything.',
+        content: 'Tests must pass.\nSkip tests if slow.\nMinimal diff.\nRefactor everything.',
       },
     ])
     expect(issues.some((i) => i.id === 'contradiction-tests')).toBe(true)

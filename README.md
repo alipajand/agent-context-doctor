@@ -184,11 +184,26 @@ If you pass `--fail-on medium` on the CLI, it overrides `failOn` in `.acdrc`. Co
 }
 ```
 
+## Quality score
+
+Every audit run produces a 0–100 score shown in the terminal and included in JSON and Markdown output.
+
+| Score | Grade |
+|-------|-------|
+| 90–100 | `excellent` |
+| 75–89 | `good` |
+| 50–74 | `needs-work` |
+| 0–49 | `risky` |
+
+Deductions: **−20** per high issue, **−8** per medium, **−3** per low. Floor is 0.
+
 ## Development
 
 ```bash
 pnpm install
 pnpm dev audit          # run against this repo
+pnpm format             # auto-format
+pnpm format:check       # check formatting (runs in CI)
 pnpm test               # run tests
 pnpm typecheck          # type check
 pnpm build              # compile to dist/
@@ -201,3 +216,11 @@ pnpm build              # compile to dist/
 - No web UI — terminal and file output only
 - No guarantee of correctness — this tool gives you signals, not certainty
 - No replacement for human review — agents still need human oversight
+
+## Security
+
+See [SECURITY.md](./SECURITY.md). To report a vulnerability, use [GitHub Security Advisories](https://github.com/alipajand/agent-context-doctor/security/advisories/new) — do not open a public issue.
+
+## License
+
+[MIT](./LICENSE) © 2026 Ali Pajand

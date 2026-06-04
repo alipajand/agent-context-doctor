@@ -6,9 +6,7 @@ export async function writeReport(
   content: string,
   repoPath: string,
 ): Promise<string> {
-  const resolved = path.isAbsolute(outputPath)
-    ? outputPath
-    : path.resolve(repoPath, outputPath)
+  const resolved = path.isAbsolute(outputPath) ? outputPath : path.resolve(repoPath, outputPath)
 
   await fs.mkdir(path.dirname(resolved), { recursive: true })
   await fs.writeFile(resolved, content, 'utf-8')

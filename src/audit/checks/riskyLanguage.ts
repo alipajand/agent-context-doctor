@@ -12,17 +12,15 @@ const HIGH_RISK_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
 ]
 
 const MEDIUM_RISK_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
-  { pattern: /make\s+product\s+decisions/i, label: 'make product decisions' },
+  // Negative lookbehind: "do not make product decisions" should not be flagged
+  { pattern: /(?<!not\s)make\s+product\s+decisions/i, label: 'make product decisions' },
   { pattern: /decide\s+the\s+strategy/i, label: 'decide the strategy' },
   { pattern: /refactor\s+everything/i, label: 'refactor everything' },
   { pattern: /rewrite\s+the\s+app/i, label: 'rewrite the app' },
   { pattern: /delete\s+unused\s+code/i, label: 'delete unused code' },
 ]
 
-export function checkRiskyLanguage(
-  filePath: string,
-  content: string,
-): ContextIssue[] {
+export function checkRiskyLanguage(filePath: string, content: string): ContextIssue[] {
   const issues: ContextIssue[] = []
   const lines = content.split('\n')
 

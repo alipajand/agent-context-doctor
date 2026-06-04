@@ -132,7 +132,13 @@ describe('disabledChecks', () => {
       JSON.stringify({ scripts: { test: 'vitest' } }),
     )
     const result = await auditRepo(tmpDir, {
-      disabledChecks: ['placeholder-content', 'safety-boundaries', 'validation-commands', 'final-reporting', 'command-alignment'],
+      disabledChecks: [
+        'placeholder-content',
+        'safety-boundaries',
+        'validation-commands',
+        'final-reporting',
+        'command-alignment',
+      ],
     })
     const categories = result.issues.map((i) => i.category)
     expect(categories).not.toContain('placeholder-content')

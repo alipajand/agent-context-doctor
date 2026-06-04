@@ -4,7 +4,15 @@ import type { PackageJsonScripts } from '../../fs/readPackageJson.js'
 const PACKAGE_MANAGERS = ['pnpm', 'npm', 'yarn', 'bun']
 
 // Built-in lifecycle commands that don't need a package.json script entry
-const BUILTIN_COMMANDS = new Set(['install', 'i', 'add', 'remove', 'uninstall', 'update', 'upgrade'])
+const BUILTIN_COMMANDS = new Set([
+  'install',
+  'i',
+  'add',
+  'remove',
+  'uninstall',
+  'update',
+  'upgrade',
+])
 
 // Pattern: `pnpm run <script>`, `npm run <script>`, `yarn run <script>`, `bun run <script>`
 const RUN_PATTERN = /\b(pnpm|npm|yarn|bun)\s+run\s+([\w:.-]+)/g
@@ -92,10 +100,7 @@ export function checkCommandAlignment(
   return issues
 }
 
-export function checkCommandsWithoutPackageJson(
-  filePath: string,
-  content: string,
-): ContextIssue[] {
+export function checkCommandsWithoutPackageJson(filePath: string, content: string): ContextIssue[] {
   const hasPackageManagerRef = PACKAGE_MANAGERS.some((pm) =>
     new RegExp(`\\b${pm}\\s+`).test(content),
   )

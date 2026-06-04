@@ -37,65 +37,67 @@ program
     '--fail-on <severity>',
     'Exit non-zero if any issue at or above this severity is found (low|medium|high)',
   )
-  .action(async (
-    cliRepoPath: string | undefined,
-    opts: { json?: boolean; output?: string; failOn?: string },
-  ) => {
-    // Determine config search dir: CLI path if given, otherwise cwd
-    const configSearchDir = path.resolve(cliRepoPath ?? process.cwd())
-    let config = null
-    try {
-      config = await loadConfig(configSearchDir)
-    } catch (err) {
-      process.stderr.write(`Config error: ${err instanceof Error ? err.message : String(err)}\n`)
-      process.exit(1)
-    }
-
-    // Resolve repoPath: CLI arg > config.audit.repoPath > cwd
-    const resolvedRepo = cliRepoPath
-      ? path.resolve(cliRepoPath)
-      : config?.audit?.repoPath
-        ? path.resolve(configSearchDir, config.audit.repoPath)
-        : path.resolve(process.cwd())
-
-    // CLI flags override config
-    const useJson = opts.json ?? config?.audit?.json ?? false
-    const outputPath = opts.output ?? config?.audit?.output
-    const failOnRaw = opts.failOn ?? config?.audit?.failOn
-
-    if (!useJson) {
-      process.stderr.write(`Auditing ${resolvedRepo}...\n`)
-    }
-
-    const result = await auditRepo(resolvedRepo, {
-      ignoreFiles: config?.rules?.ignoreFiles,
-      disabledChecks: config?.rules?.disabledChecks,
-      allowedMissingScripts: config?.rules?.allowedMissingScripts,
-    })
-
-    if (outputPath) {
-      const mdContent = toMarkdownReport(result)
-      const writtenPath = await writeReport(outputPath, mdContent, resolvedRepo)
-      process.stderr.write(`Markdown report written to ${writtenPath}\n`)
-    }
-
-    if (useJson) {
-      process.stdout.write(toJsonReport(result) + '\n')
-    } else {
-      printTerminalReport(result)
-    }
-
-    if (failOnRaw) {
-      const sev = failOnRaw as Severity
-      if (!['low', 'medium', 'high'].includes(sev)) {
-        process.stderr.write(`Invalid fail-on value: "${sev}". Use low, medium, or high.\n`)
+  .action(
+    async (
+      cliRepoPath: string | undefined,
+      opts: { json?: boolean; output?: string; failOn?: string },
+    ) => {
+      // Determine config search dir: CLI path if given, otherwise cwd
+      const configSearchDir = path.resolve(cliRepoPath ?? process.cwd())
+      let config = null
+      try {
+        config = await loadConfig(configSearchDir)
+      } catch (err) {
+        process.stderr.write(`Config error: ${err instanceof Error ? err.message : String(err)}\n`)
         process.exit(1)
       }
-      if (shouldFail(result, sev)) {
-        process.exit(1)
+
+      // Resolve repoPath: CLI arg > config.audit.repoPath > cwd
+      const resolvedRepo = cliRepoPath
+        ? path.resolve(cliRepoPath)
+        : config?.audit?.repoPath
+          ? path.resolve(configSearchDir, config.audit.repoPath)
+          : path.resolve(process.cwd())
+
+      // CLI flags override config
+      const useJson = opts.json ?? config?.audit?.json ?? false
+      const outputPath = opts.output ?? config?.audit?.output
+      const failOnRaw = opts.failOn ?? config?.audit?.failOn
+
+      if (!useJson) {
+        process.stderr.write(`Auditing ${resolvedRepo}...\n`)
       }
-    }
-  })
+
+      const result = await auditRepo(resolvedRepo, {
+        ignoreFiles: config?.rules?.ignoreFiles,
+        disabledChecks: config?.rules?.disabledChecks,
+        allowedMissingScripts: config?.rules?.allowedMissingScripts,
+      })
+
+      if (outputPath) {
+        const mdContent = toMarkdownReport(result)
+        const writtenPath = await writeReport(outputPath, mdContent, resolvedRepo)
+        process.stderr.write(`Markdown report written to ${writtenPath}\n`)
+      }
+
+      if (useJson) {
+        process.stdout.write(toJsonReport(result) + '\n')
+      } else {
+        printTerminalReport(result)
+      }
+
+      if (failOnRaw) {
+        const sev = failOnRaw as Severity
+        if (!['low', 'medium', 'high'].includes(sev)) {
+          process.stderr.write(`Invalid fail-on value: "${sev}". Use low, medium, or high.\n`)
+          process.exit(1)
+        }
+        if (shouldFail(result, sev)) {
+          process.exit(1)
+        }
+      }
+    },
+  )
 
 program
   .command('list [repoPath]')

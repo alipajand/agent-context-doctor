@@ -17,10 +17,7 @@ const SAFETY_PATTERNS = [
   /production/i,
 ]
 
-export function checkSafetyBoundaries(
-  filePath: string,
-  content: string,
-): ContextIssue[] {
+export function checkSafetyBoundaries(filePath: string, content: string): ContextIssue[] {
   const hasSafety = SAFETY_PATTERNS.some((p) => p.test(content))
   if (hasSafety) return []
 
