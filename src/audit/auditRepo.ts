@@ -10,6 +10,7 @@ import {
   checkCommandsWithoutPackageJson,
 } from './checks/commandAlignment.js'
 import { checkContradictions } from './checks/contradictions.js'
+import { computeScore } from './score.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
 import type { AuditResult, ContextIssue } from '../types.js'
@@ -85,6 +86,7 @@ export async function auditRepo(repoPath: string): Promise<AuditResult> {
       medium,
       low,
     },
+    score: computeScore(issues),
     issues,
   }
 }

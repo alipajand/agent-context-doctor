@@ -11,7 +11,7 @@ function issueRow(issue: ContextIssue): string {
 }
 
 export function toMarkdownReport(result: AuditResult): string {
-  const { repoPath, files, summary, issues } = result
+  const { repoPath, files, summary, score, issues } = result
   const timestamp = new Date().toISOString()
 
   const severityOrder: Severity[] = ['high', 'medium', 'low']
@@ -22,12 +22,14 @@ export function toMarkdownReport(result: AuditResult): string {
   lines.push('')
   lines.push(`**Generated:** ${timestamp}`)
   lines.push(`**Repo:** \`${repoPath}\``)
+  lines.push(`**Score:** ${score.total} / ${score.max} — ${score.grade}`)
   lines.push('')
 
   lines.push('## Summary')
   lines.push('')
   lines.push(`| Metric | Value |`)
   lines.push(`|--------|-------|`)
+  lines.push(`| Quality score | ${score.total} / ${score.max} (${score.grade}) |`)
   lines.push(`| Context files | ${summary.fileCount} |`)
   lines.push(`| Total issues | ${summary.issueCount} |`)
   lines.push(`| High | ${summary.high} |`)

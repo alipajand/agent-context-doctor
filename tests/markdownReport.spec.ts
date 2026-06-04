@@ -16,6 +16,7 @@ const sampleResult: AuditResult = {
     medium: 1,
     low: 1,
   },
+  score: { total: 69, max: 100, grade: 'needs-work' },
   issues: [
     {
       id: 'risky-high-AGENTS.md-0-skip tests',
@@ -100,14 +101,29 @@ describe('toMarkdownReport', () => {
     expect(md).toContain('**Generated:**')
   })
 
+  it('includes score near the top', () => {
+    const md = toMarkdownReport(sampleResult)
+    expect(md).toContain('**Score:**')
+    expect(md).toContain('69 / 100')
+    expect(md).toContain('needs-work')
+  })
+
+  it('includes score in summary table', () => {
+    const md = toMarkdownReport(sampleResult)
+    expect(md).toContain('| Quality score |')
+  })
+
   it('handles no issues gracefully', () => {
     const emptyResult: AuditResult = {
       ...sampleResult,
       summary: { fileCount: 1, issueCount: 0, high: 0, medium: 0, low: 0 },
+      score: { total: 100, max: 100, grade: 'excellent' },
       issues: [],
     }
     const md = toMarkdownReport(emptyResult)
     expect(md).toContain('_No issues found._')
+    expect(md).toContain('100 / 100')
+    expect(md).toContain('excellent')
   })
 
   it('handles no files gracefully', () => {
@@ -115,6 +131,7 @@ describe('toMarkdownReport', () => {
       ...sampleResult,
       files: [],
       summary: { fileCount: 0, issueCount: 0, high: 0, medium: 0, low: 0 },
+      score: { total: 100, max: 100, grade: 'excellent' },
       issues: [],
     }
     const md = toMarkdownReport(noFilesResult)
@@ -136,6 +153,9 @@ describe('toJsonReport', () => {
     expect(parsed.summary.issueCount).toBe(3)
     expect(parsed.issues).toHaveLength(3)
     expect(parsed.issues[0].severity).toBe('high')
+    expect(parsed.score.total).toBe(69)
+    expect(parsed.score.max).toBe(100)
+    expect(parsed.score.grade).toBe('needs-work')
   })
 
   it('includes all issue fields', () => {

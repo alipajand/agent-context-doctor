@@ -25,6 +25,14 @@ export type ContextFile = {
   bytes: number
 }
 
+export type ScoreGrade = 'excellent' | 'good' | 'needs-work' | 'risky'
+
+export type AuditScore = {
+  total: number
+  max: 100
+  grade: ScoreGrade
+}
+
 export type AuditResult = {
   repoPath: string
   files: ContextFile[]
@@ -35,5 +43,6 @@ export type AuditResult = {
     medium: number
     low: number
   }
+  score: AuditScore
   issues: ContextIssue[]
 }

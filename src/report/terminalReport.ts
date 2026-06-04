@@ -1,5 +1,5 @@
 import pc from 'picocolors'
-import type { AuditResult } from '../types.js'
+import type { AuditResult, ScoreGrade } from '../types.js'
 
 function severityColor(severity: string): string {
   switch (severity) {
@@ -14,8 +14,21 @@ function severityColor(severity: string): string {
   }
 }
 
+function gradeColor(grade: ScoreGrade, label: string): string {
+  switch (grade) {
+    case 'excellent':
+      return pc.green(label)
+    case 'good':
+      return pc.cyan(label)
+    case 'needs-work':
+      return pc.yellow(label)
+    case 'risky':
+      return pc.red(label)
+  }
+}
+
 export function printTerminalReport(result: AuditResult): void {
-  const { repoPath, files, summary, issues } = result
+  const { repoPath, files, summary, score, issues } = result
 
   console.log()
   console.log(pc.bold(pc.white('Agent Context Doctor')))
@@ -28,6 +41,9 @@ export function printTerminalReport(result: AuditResult): void {
       ? pc.green(`${summary.issueCount} total`)
       : `${summary.issueCount} total — ${pc.red(`${summary.high} high`)}, ${pc.yellow(`${summary.medium} medium`)}, ${pc.cyan(`${summary.low} low`)}`
   console.log(`${pc.bold('Issues:')}  ${issueLabel}`)
+  console.log(
+    `${pc.bold('Score:')}   ${gradeColor(score.grade, `${score.total} / ${score.max}`)} — ${gradeColor(score.grade, score.grade)}`,
+  )
 
   if (files.length > 0) {
     console.log()
