@@ -15,9 +15,18 @@ import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
 import type { AuditResult, ContextIssue } from '../types.js'
 
-export async function auditRepo(repoPath: string): Promise<AuditResult> {
+export type AuditOptions = {
+  ignoreFiles?: string[]
+  disabledChecks?: string[]
+  allowedMissingScripts?: string[]
+}
+
+export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Promise<AuditResult> {
   const absoluteRepo = path.resolve(repoPath)
-  const contextFiles = await detectContextFiles(absoluteRepo)
+  const disabled = new Set(opts.disabledChecks ?? [])
+  const allowedScripts = new Set(opts.allowedMissingScripts ?? [])
+
+  const contextFiles = await detectContextFiles(absoluteRepo, opts.ignoreFiles ?? [])
   const packageScripts = await readPackageScripts(absoluteRepo)
 
   const issues: ContextIssue[] = []
@@ -42,35 +51,45 @@ export async function auditRepo(repoPath: string): Promise<AuditResult> {
 
     fileContents.push({ path: ctxFile.path, content })
 
-    const placeholderIssues = checkPlaceholderContent(ctxFile.path, content)
-    issues.push(...placeholderIssues)
+    if (!disabled.has('placeholder-content')) {
+      issues.push(...checkPlaceholderContent(ctxFile.path, content))
+    }
 
-    const riskyIssues = checkRiskyLanguage(ctxFile.path, content)
-    issues.push(...riskyIssues)
+    if (!disabled.has('risky-language')) {
+      issues.push(...checkRiskyLanguage(ctxFile.path, content))
+    }
 
-    if (packageScripts !== null) {
-      const cmdIssues = checkCommandAlignment(ctxFile.path, content, packageScripts)
-      issues.push(...cmdIssues)
-    } else {
-      const noPkgIssues = checkCommandsWithoutPackageJson(ctxFile.path, content)
-      issues.push(...noPkgIssues)
+    if (!disabled.has('command-alignment')) {
+      if (packageScripts !== null) {
+        const cmdIssues = checkCommandAlignment(ctxFile.path, content, packageScripts).filter(
+          (i) => {
+            const scriptMatch = i.message.match(/missing package script: "(.+)"/)
+            return !scriptMatch || !allowedScripts.has(scriptMatch[1])
+          },
+        )
+        issues.push(...cmdIssues)
+      } else {
+        issues.push(...checkCommandsWithoutPackageJson(ctxFile.path, content))
+      }
     }
 
     if (isPrimaryInstructionFile(ctxFile.path)) {
-      const safetyIssues = checkSafetyBoundaries(ctxFile.path, content)
-      issues.push(...safetyIssues)
-
-      const validationIssues = checkValidationCommands(ctxFile.path, content)
-      issues.push(...validationIssues)
-
-      const reportingIssues = checkFinalReporting(ctxFile.path, content)
-      issues.push(...reportingIssues)
+      if (!disabled.has('safety-boundaries')) {
+        issues.push(...checkSafetyBoundaries(ctxFile.path, content))
+      }
+      if (!disabled.has('validation-commands')) {
+        issues.push(...checkValidationCommands(ctxFile.path, content))
+      }
+      if (!disabled.has('final-reporting')) {
+        issues.push(...checkFinalReporting(ctxFile.path, content))
+      }
     }
   }
 
   // Cross-file contradiction check runs after all files are collected
-  const contradictionIssues = checkContradictions(fileContents)
-  issues.push(...contradictionIssues)
+  if (!disabled.has('contradictions')) {
+    issues.push(...checkContradictions(fileContents))
+  }
 
   const high = issues.filter((i) => i.severity === 'high').length
   const medium = issues.filter((i) => i.severity === 'medium').length

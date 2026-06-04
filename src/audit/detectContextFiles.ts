@@ -17,8 +17,11 @@ function classifyFile(filePath: string): ContextFileKind {
   return 'unknown'
 }
 
-export async function detectContextFiles(repoPath: string): Promise<ContextFile[]> {
-  const filePaths = await findContextFiles(repoPath)
+export async function detectContextFiles(
+  repoPath: string,
+  ignoreFiles: string[] = [],
+): Promise<ContextFile[]> {
+  const filePaths = await findContextFiles(repoPath, ignoreFiles)
 
   const results: ContextFile[] = []
   for (const filePath of filePaths) {

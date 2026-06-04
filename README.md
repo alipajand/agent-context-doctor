@@ -106,6 +106,84 @@ Issues:
     Recommendation: Add instructions about final report.
 ```
 
+## Configuration — `.acdrc`
+
+Add an optional `.acdrc` file at the repo root to customize audit behavior without changing CLI commands. It is a JSON file validated strictly on load — invalid config exits non-zero with a clear message.
+
+### Schema
+
+```json
+{
+  "audit": {
+    "repoPath": "packages/app",
+    "output": "docs/agent-context-report.md",
+    "json": false,
+    "failOn": "high"
+  },
+  "rules": {
+    "ignoreFiles": ["docs/prompts/legacy/**"],
+    "disabledChecks": ["placeholder-content"],
+    "allowedMissingScripts": ["validate"]
+  }
+}
+```
+
+### `audit` options
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `repoPath` | `string` | Default repo to audit (relative to `.acdrc` location). Overridden by CLI `[repoPath]` arg. |
+| `output` | `string` | Default Markdown output path. Overridden by `--output`. |
+| `json` | `boolean` | Default JSON mode. Overridden by `--json`. |
+| `failOn` | `"low" \| "medium" \| "high"` | Default fail threshold. Overridden by `--fail-on`. |
+
+### `rules` options
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. |
+| `disabledChecks` | `string[]` | Check categories to disable. Valid values: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`. Unknown values fail validation. |
+| `allowedMissingScripts` | `string[]` | Package script names that are allowed to be absent from `package.json` without raising a `command-alignment` issue. |
+
+### CLI precedence
+
+`CLI flags > .acdrc > defaults`
+
+If you pass `--fail-on medium` on the CLI, it overrides `failOn` in `.acdrc`. Config is loaded from the resolved repo path (or `cwd` if no path is given).
+
+### Examples
+
+**Ignore legacy prompt files:**
+
+```json
+{
+  "rules": {
+    "ignoreFiles": ["docs/prompts/legacy/**", "prompts/archive/**"]
+  }
+}
+```
+
+**Allow a known missing CI script:**
+
+```json
+{
+  "rules": {
+    "allowedMissingScripts": ["validate", "ci"]
+  }
+}
+```
+
+**Always write a Markdown report and fail on high issues:**
+
+```json
+{
+  "audit": {
+    "output": "docs/agent-context-report.md",
+    "failOn": "high"
+  }
+}
+```
+
 ## Development
 
 ```bash

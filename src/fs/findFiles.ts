@@ -21,14 +21,15 @@ const IGNORE_DIRS = [
   '**/coverage/**',
 ]
 
-export async function findContextFiles(repoPath: string): Promise<string[]> {
-  const patterns = CONTEXT_PATTERNS.map((p) =>
-    path.isAbsolute(p) ? p : p,
-  )
+export async function findContextFiles(
+  repoPath: string,
+  extraIgnore: string[] = [],
+): Promise<string[]> {
+  const ignore = [...IGNORE_DIRS, ...extraIgnore]
 
-  const files = await fg(patterns, {
+  const files = await fg(CONTEXT_PATTERNS, {
     cwd: repoPath,
-    ignore: IGNORE_DIRS,
+    ignore,
     absolute: true,
     dot: true,
     caseSensitiveMatch: false,
