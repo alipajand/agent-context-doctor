@@ -25,9 +25,10 @@ export async function loadConfig(searchDir: string): Promise<AcdRc | null> {
 
   const result = AcdRcSchema.safeParse(parsed)
   if (!result.success) {
-    const messages = result.error.errors
-      .map((e) => `  ${e.path.join('.')}: ${e.message}`)
-      .join('\n')
+    // Zod v4 uses `issues`; v3 used `errors` — support both
+    const issues =
+      result.error.issues ?? (result.error as { errors?: typeof result.error.issues }).errors ?? []
+    const messages = issues.map((e) => `  ${e.path.join('.')}: ${e.message}`).join('\n')
     throw new Error(`.acdrc at ${configPath} failed validation:\n${messages}`)
   }
 
