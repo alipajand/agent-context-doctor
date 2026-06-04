@@ -5,3 +5,6 @@ docs/agent-context-report.md
 *.tsbuildinfo
 .DS_Store
 .idea/
+.env
+.env.local
+.env.*.local

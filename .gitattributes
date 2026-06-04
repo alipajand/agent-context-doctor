@@ -1,0 +1,13 @@
+# Normalize line endings to LF on checkout
+* text=auto eol=lf
+
+# Binary files — never diff or merge
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf
+
+# Force LF for scripts
+*.sh text eol=lf
