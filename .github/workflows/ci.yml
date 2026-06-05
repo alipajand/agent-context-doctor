@@ -52,4 +52,4 @@ jobs:
           node dist/cli.js audit examples/good-context
 
       - name: Verify pack contents
-        run: pnpm pack --dry-run
+        run: pnpm pack && rm *.tgz

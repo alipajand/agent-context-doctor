@@ -59,7 +59,7 @@ Confirm:
 ### 5. Inspect the pack contents
 
 ```bash
-pnpm pack --dry-run
+pnpm pack && tar -tzf *.tgz && rm *.tgz
 ```
 
 Verify the tarball only includes:
