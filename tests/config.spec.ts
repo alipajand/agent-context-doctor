@@ -71,6 +71,34 @@ describe('loadConfig', () => {
     const config = await loadConfig(tmpDir)
     expect(config).toBeDefined()
   })
+
+  it('loads full audit section options', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, '.acdrc'),
+      JSON.stringify({
+        audit: {
+          repoPath: '.',
+          output: 'docs/report.md',
+          json: true,
+          failOn: 'medium',
+        },
+      }),
+    )
+    const config = await loadConfig(tmpDir)
+    expect(config?.audit?.repoPath).toBe('.')
+    expect(config?.audit?.output).toBe('docs/report.md')
+    expect(config?.audit?.json).toBe(true)
+    expect(config?.audit?.failOn).toBe('medium')
+  })
+
+  it('loads allowedMissingScripts from rules', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, '.acdrc'),
+      JSON.stringify({ rules: { allowedMissingScripts: ['validate', 'deploy'] } }),
+    )
+    const config = await loadConfig(tmpDir)
+    expect(config?.rules?.allowedMissingScripts).toEqual(['validate', 'deploy'])
+  })
 })
 
 // ── ignoreFiles integration ──────────────────────────────────────────────────

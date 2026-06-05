@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { auditRepo } from '../src/audit/auditRepo.js'
+import * as contradictions from '../src/audit/checks/contradictions.js'
 
 let tmpDir: string
 
@@ -103,5 +104,50 @@ Include: files changed, commands run, tests passed, known limitations.
     expect(result.summary.medium).toBe(medium)
     expect(result.summary.low).toBe(low)
     expect(result.summary.issueCount).toBe(high + medium + low)
+  })
+
+  it('includes contradiction issues when involved files cannot be resolved', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), 'placeholder')
+    vi.spyOn(contradictions, 'checkContradictions').mockReturnValueOnce([
+      {
+        id: 'contradiction-tests',
+        severity: 'high',
+        category: 'contradictions',
+        file: 'multiple',
+        message: 'Contradictory agent instructions detected: tests',
+        recommendation: 'Remove one side of the contradiction.',
+      },
+    ])
+
+    const result = await auditRepo(tmpDir)
+    expect(result.issues.some((i) => i.id === 'contradiction-tests')).toBe(true)
+    vi.restoreAllMocks()
+  })
+
+  it('skips contradictions check when disabled', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'AGENTS.md'),
+      'Tests must pass. Skip tests. Ask before auth. pnpm test. Final report: summary.',
+    )
+    const result = await auditRepo(tmpDir, { disabledChecks: ['contradictions'] })
+    expect(result.issues.some((i) => i.category === 'contradictions')).toBe(false)
+  })
+
+  it('does not run primary instruction checks on prompt files', async () => {
+    const promptsDir = path.join(tmpDir, 'prompts')
+    await fs.mkdir(promptsDir, { recursive: true })
+    await fs.writeFile(path.join(promptsDir, 'review.md'), '# Prompt only\nNo safety language.')
+    const result = await auditRepo(tmpDir)
+    const promptSafety = result.issues.filter(
+      (i) => i.category === 'safety-boundaries' && i.file.includes('review.md'),
+    )
+    expect(promptSafety).toHaveLength(0)
+  })
+
+  it('returns a computed score in the audit result', async () => {
+    const result = await auditRepo(tmpDir)
+    expect(result.score.max).toBe(100)
+    expect(result.score.total).toBeGreaterThanOrEqual(0)
+    expect(result.score.grade).toBeDefined()
   })
 })

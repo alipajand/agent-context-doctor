@@ -77,6 +77,31 @@ describe('extractCommands', () => {
     expect(scripts).toContain('lint')
     expect(scripts).toContain('build')
   })
+
+  it('deduplicates identical run commands on the same line', () => {
+    const cmds = extractCommands('pnpm run test pnpm run test')
+    expect(cmds.filter((c) => c.script === 'test')).toHaveLength(1)
+  })
+
+  it('deduplicates shorthand when run form already captured the script', () => {
+    const cmds = extractCommands('pnpm run lint and pnpm lint')
+    expect(cmds.filter((c) => c.script === 'lint')).toHaveLength(1)
+  })
+
+  it('does not extract npm build as a shorthand script', () => {
+    const cmds = extractCommands('Run npm build before deploying')
+    expect(cmds.some((c) => c.script === 'build')).toBe(false)
+  })
+
+  it('extracts npm test as a shorthand script', () => {
+    const cmds = extractCommands('Run npm test to verify')
+    expect(cmds.some((c) => c.script === 'test')).toBe(true)
+  })
+
+  it('skips bun add as a package-manager sub-command', () => {
+    const cmds = extractCommands('Run bun add lodash first')
+    expect(cmds.some((c) => c.script === 'add')).toBe(false)
+  })
 })
 
 // ── checkCommandAlignment ───────────────────────────────────────────────────

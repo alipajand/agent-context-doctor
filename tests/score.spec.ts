@@ -105,4 +105,18 @@ describe('computeScore', () => {
     expect(computeScore([]).max).toBe(100)
     expect(computeScore(makeIssue('high', 5)).max).toBe(100)
   })
+
+  it('ignores unknown severity values when computing deductions', () => {
+    const issues: ContextIssue[] = [
+      {
+        id: 'unknown-severity',
+        severity: 'critical' as ContextIssue['severity'],
+        category: 'test',
+        file: 'AGENTS.md',
+        message: 'test',
+        recommendation: 'test',
+      },
+    ]
+    expect(computeScore(issues).total).toBe(100)
+  })
 })
