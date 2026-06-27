@@ -79,6 +79,32 @@ describe('detectContextFiles', () => {
     expect(files.find((f) => f.path === 'CLAUDE.md')?.kind).toBe('claude')
   })
 
+  it('classifies lowercase claude.md as claude', async () => {
+    await fs.writeFile(path.join(tmpDir, 'claude.md'), '# Claude')
+    const files = await detectContextFiles(tmpDir)
+    expect(files.find((f) => f.path.toLowerCase() === 'claude.md')?.kind).toBe('claude')
+  })
+
+  it('detects .claude/CLAUDE.md', async () => {
+    const claudeDir = path.join(tmpDir, '.claude')
+    await fs.mkdir(claudeDir, { recursive: true })
+    await fs.writeFile(path.join(claudeDir, 'CLAUDE.md'), '# Claude')
+    const files = await detectContextFiles(tmpDir)
+    const found = files.find((f) => f.path.includes('CLAUDE.md'))
+    expect(found).toBeDefined()
+    expect(found?.kind).toBe('claude')
+  })
+
+  it('detects .claude/commands/review.md as claude', async () => {
+    const cmdDir = path.join(tmpDir, '.claude', 'commands')
+    await fs.mkdir(cmdDir, { recursive: true })
+    await fs.writeFile(path.join(cmdDir, 'review.md'), '# Review command')
+    const files = await detectContextFiles(tmpDir)
+    const found = files.find((f) => f.path.includes('review.md'))
+    expect(found).toBeDefined()
+    expect(found?.kind).toBe('claude')
+  })
+
   it('classifies .codex/**/*.md as codex', async () => {
     const codexDir = path.join(tmpDir, '.codex')
     await fs.mkdir(codexDir, { recursive: true })

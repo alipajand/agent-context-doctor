@@ -8,7 +8,7 @@ function classifyFile(filePath: string): ContextFileKind {
   const rel = filePath.replace(/\\/g, '/')
 
   if (base === 'agents.md') return 'agents'
-  if (base === 'claude.md') return 'claude'
+  if (base === 'claude.md' || rel.includes('.claude/')) return 'claude'
   if (base === '.cursorrules' || rel.includes('.cursor/rules/')) return 'cursor'
   if (rel.includes('copilot-instructions')) return 'copilot'
   if (rel.includes('.codex/')) return 'codex'

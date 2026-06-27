@@ -25,6 +25,14 @@
     "format:check": "prettier --check .",
     "clean": "rm -rf dist docs/agent-context-report.md"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alipajand/agent-context-doctor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alipajand/agent-context-doctor/issues"
+  },
+  "homepage": "https://github.com/alipajand/agent-context-doctor#readme",
   "keywords": [
     "agent",
     "context",
@@ -33,7 +41,9 @@
     "cursor",
     "copilot",
     "claude",
-    "codex"
+    "claude-code",
+    "codex",
+    "ai-agents"
   ],
   "license": "MIT",
   "engines": {

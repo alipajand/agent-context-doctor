@@ -1,107 +1,33 @@
 # agent-context-doctor
 
-A deterministic CLI that audits repository agent context files for quality, safety, contradictions, stale commands, and generic placeholder content.
+`agent-context-doctor` checks whether your agent instruction files are specific, safe, and usable. It catches placeholder content, risky language, contradictions, stale commands, and missing validation guidance before those instructions guide an AI coding agent.
 
-## What it does
+## What it is
 
-`agent-context-doctor` (`acd`) scans your repository for agent instruction files (AGENTS.md, CLAUDE.md, .cursorrules, Copilot instructions, etc.) and checks each one for common problems:
+A small, deterministic CLI (`acd`) that reads the instruction files in your repository — `AGENTS.md`, `CLAUDE.md`, Cursor rules, Copilot instructions, and similar — and reports quality and safety problems with a severity rating and a 0–100 score.
 
-- **Presence** — Are any agent context files present at all?
-- **Placeholder content** — Are there unfilled template markers like `TODO`, `TBD`, `lorem ipsum`, or blank scope sections?
-- **Safety boundaries** — Do primary instruction files include forbidden-change / ask-before language covering auth, billing, database, and production?
-- **Validation commands** — Do instruction files tell agents to run tests, lint, or typecheck?
-- **Final reporting** — Do instruction files tell agents what to include in their final summary?
-- **Risky language** — Do instructions contain dangerous directives like "skip tests", "bypass auth", or "commit secrets"?
+It runs locally, makes no network calls, and is meant to complement human review, not replace it.
 
-## What it does NOT do
+## Why it exists
 
-- Does **not** call any LLM or AI API
-- Does **not** collect telemetry or phone home
-- Does **not** require authentication
-- Does **not** guarantee that agent outputs will be correct
-- Does **not** replace human code review
+AI coding agents follow whatever their instruction files tell them. A file full of `TODO` placeholders, a stray "skip tests if they're slow," or two files that contradict each other will quietly steer an agent toward unsafe or low-quality changes — and nobody notices until the diff lands.
 
-## Install
+`acd` makes those problems visible in CI or on your machine, deterministically, so you can fix the instructions before they cause trouble.
 
-**From npm** (after npm release):
+## What it checks
 
-```bash
-npm install -g agent-context-doctor # after npm release
-```
+| Check | Looks for |
+|-------|-----------|
+| **Presence** | Whether any agent context file exists at all |
+| **Placeholder content** | Unfilled markers like `TODO`, `TBD`, `lorem ipsum`, or blank scope sections |
+| **Risky language** | Directives like "skip tests", "bypass auth", or "commit secrets" |
+| **Safety boundaries** | Whether primary files include ask-before / forbidden-change language for auth, billing, database, and production |
+| **Validation commands** | Whether instructions tell agents to run tests, lint, or typecheck |
+| **Final reporting** | Whether instructions describe what to include in a final summary |
+| **Command alignment** | Commands referenced in instructions that don't match `package.json` scripts |
+| **Contradictions** | Conflicting directives across two or more files |
 
-**Local development install:**
-
-```bash
-git clone https://github.com/alipajand/agent-context-doctor.git
-cd agent-context-doctor
-pnpm install
-pnpm dev audit        # run against the current directory
-pnpm build            # compile to dist/
-node dist/cli.js audit # run the compiled binary directly
-```
-
-## Initialize starter context
-
-If your repository has no agent context file yet, `acd init` creates a safe, opinionated `AGENTS.md` in one command:
-
-```bash
-acd init                  # write AGENTS.md in the current directory
-acd init /path/to/repo    # write AGENTS.md in a specific directory
-acd init --force          # overwrite an existing AGENTS.md
-acd init --print          # print the template to stdout without writing
-```
-
-**Safety behavior:**
-
-- `acd init` will **not** overwrite an existing `AGENTS.md` unless you pass `--force`.
-- If `AGENTS.md` already exists, the command exits non-zero with:
-  `AGENTS.md already exists. Use --force to overwrite.`
-
-**After running `acd init`, review and customize the generated file.** The starter template includes placeholder commands (`pnpm typecheck`, `pnpm test`, `pnpm build`) that may not exist in your project. Replace them with the actual commands from your `package.json`, or configure `allowedMissingScripts` in `.acdrc` to suppress false-positive command-alignment warnings.
-
-## Commands
-
-```bash
-# Audit current directory
-acd audit
-
-# Audit a specific repo path
-acd audit /path/to/repo
-
-# Output as JSON
-acd audit --json
-
-# Write a Markdown report
-acd audit --output docs/agent-context-report.md
-
-# Combine JSON + Markdown
-acd audit --json --output docs/agent-context-report.md
-
-# Exit non-zero if high/medium/low issues exist
-acd audit --fail-on high
-acd audit --fail-on medium
-acd audit --fail-on low
-
-# List detected context files only
-acd list
-acd list /path/to/repo
-```
-
-## Audited file types
-
-| Pattern | Kind |
-|---------|------|
-| `AGENTS.md` | agents |
-| `CLAUDE.md` | claude |
-| `.cursorrules` | cursor |
-| `.cursor/rules/*.mdc` | cursor |
-| `.github/copilot-instructions.md` | copilot |
-| `docs/prompts/**/*.md` | prompt |
-| `prompts/**/*.md` | prompt |
-| `.codex/**/*.md` | codex |
-| `.github/instructions/**/*.md` | prompt |
-
-## Severity model
+### Severity and score
 
 | Level | Meaning |
 |-------|---------|
@@ -109,9 +35,102 @@ acd list /path/to/repo
 | `medium` | Weakens safety, completeness, or correctness |
 | `low` | Missing guidance that would improve agent output quality |
 
-Exit codes: `0` = clean (or issues below threshold), `1` = issues found at or above `--fail-on` threshold.
+Every run produces a 0–100 score: start at 100, subtract **20** per high issue, **8** per medium, **3** per low (floor 0).
 
-## Sample output
+| Score | Grade |
+|-------|-------|
+| 90–100 | `excellent` |
+| 75–89 | `good` |
+| 50–74 | `needs-work` |
+| 0–49 | `risky` |
+
+## Quick start
+
+Install from npm (after release):
+
+```bash
+npm install -g agent-context-doctor
+```
+
+Or run from source:
+
+```bash
+git clone https://github.com/alipajand/agent-context-doctor.git
+cd agent-context-doctor
+pnpm install
+pnpm dev audit          # audit the current directory
+```
+
+Audit a repo and list the files it found:
+
+```bash
+acd audit
+acd list
+```
+
+No instruction file yet? `acd init` writes a safe, opinionated `AGENTS.md`:
+
+```bash
+acd init                # write AGENTS.md in the current directory
+acd init /path/to/repo  # write it in a specific directory
+acd init --force        # overwrite an existing AGENTS.md
+acd init --print        # print the template without writing
+```
+
+`acd init` will not overwrite an existing `AGENTS.md` unless you pass `--force`. The starter template references `pnpm typecheck`, `pnpm test`, and `pnpm build` — replace those with your project's real commands, or list them under `allowedMissingScripts` in `.acdrc`.
+
+## Common examples
+
+```bash
+acd audit                                  # audit the current directory
+acd audit /path/to/repo                    # audit a specific path
+acd audit --json                           # machine-readable output
+acd audit --output docs/report.md          # write a Markdown report
+acd audit --json --output docs/report.md   # both at once
+acd audit --fail-on high                   # exit non-zero on high issues (also: medium, low)
+acd list                                   # list detected context files only
+```
+
+### Auditing a repo with Claude files
+
+`acd` audits Claude Code instructions wherever they live — a root `CLAUDE.md`, a `.claude/CLAUDE.md`, or command files such as `.claude/commands/review.md`:
+
+```bash
+acd audit
+acd list
+```
+
+### A risky instruction, and a safer rewrite
+
+`acd` flags language that lets an agent quietly bypass validation. For example:
+
+**Risky:**
+
+```md
+Skip tests if they are slow.
+```
+
+**Safer:**
+
+```md
+Run the smallest relevant test first. If the full suite is too slow or broken,
+report that clearly and explain what was run instead.
+```
+
+The point is not "always run everything" — it's that an agent should never be given permission to skip validation *silently*. If something can't be run, the instructions should require the agent to say so.
+
+### Try the bundled fixtures
+
+The `examples/` directory has ready-to-run fixtures. Clone the repo first.
+
+```bash
+pnpm dev audit examples/bad-context    # ~0 / 100 — risky, multiple high issues
+pnpm dev audit examples/good-context   # 97 / 100 — excellent, zero high/medium
+```
+
+`examples/bad-context` intentionally contains placeholders, risky directives, missing safety language, and a contradiction between `AGENTS.md` and `.cursor/rules/project.mdc`. `examples/good-context/AGENTS.md` follows every best practice. Use them as a starting point for your own files.
+
+### Sample output
 
 ```
 Agent Context Doctor
@@ -134,37 +153,43 @@ Issues:
     Recommendation: Add instructions about final report.
 ```
 
-Evidence snippets are short local extracts from the audited files — nothing is uploaded or transmitted.
+## Audited file types
 
-## Examples
-
-The `examples/` directory contains ready-to-run fixtures to demonstrate the difference between a well-written and a poorly-written agent context file.
-
-These example fixtures are available in the GitHub repository. Clone the repo before running these commands.
-
-**Audit the bad example** — expect many issues:
-
-```bash
-pnpm dev audit examples/bad-context
+```text
+AGENTS.md
+CLAUDE.md
+claude.md
+.claude/CLAUDE.md
+.claude/claude.md
+.claude/commands/*.md
+.cursorrules
+.cursor/rules/*.mdc
+.github/copilot-instructions.md
+docs/prompts/**/*.md
+prompts/**/*.md
+.codex/**/*.md
+.github/instructions/**/*.md
 ```
 
-`examples/bad-context` intentionally contains placeholder content (`TODO`/`TBD`), risky directives (`skip tests`), missing safety-boundary language, and contradictions between `AGENTS.md` and `.cursor/rules/project.mdc`. Running `acd` here produces a score of **0 / 100 — risky** with multiple high-severity issues.
+| Pattern | Kind |
+|---------|------|
+| `AGENTS.md` | agents |
+| `CLAUDE.md`, `claude.md` | claude |
+| `.claude/CLAUDE.md`, `.claude/claude.md` | claude |
+| `.claude/commands/*.md` | claude |
+| `.cursorrules` | cursor |
+| `.cursor/rules/*.mdc` | cursor |
+| `.github/copilot-instructions.md` | copilot |
+| `docs/prompts/**/*.md` | prompt |
+| `prompts/**/*.md` | prompt |
+| `.codex/**/*.md` | codex |
+| `.github/instructions/**/*.md` | prompt |
 
-**Audit the good example** — expect a clean result:
+Matching is case-insensitive, so `claude.md` and `CLAUDE.md` are both detected. `node_modules`, `dist`, `build`, `coverage`, and `.git` are skipped.
 
-```bash
-pnpm dev audit examples/good-context
-```
+## Configuration
 
-`examples/good-context/AGENTS.md` follows every best practice: forbidden-change boundaries, required validation commands, a final-report section, and no risky language. Running `acd` here produces a score of **97 / 100 — excellent** with zero high or medium issues.
-
-Use these examples as a starting point when writing your own instruction files or when explaining the tool to your team.
-
-## Configuration — `.acdrc`
-
-Add an optional `.acdrc` file at the repo root to customize audit behavior without changing CLI commands. It is a JSON file validated strictly on load — invalid config exits non-zero with a clear message.
-
-### Schema
+Add an optional `.acdrc` file at the repo root to set defaults without changing CLI commands. It is JSON, validated strictly on load — invalid config exits non-zero with a clear message.
 
 ```json
 {
@@ -186,7 +211,7 @@ Add an optional `.acdrc` file at the repo root to customize audit behavior witho
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `repoPath` | `string` | Default repo to audit (relative to `.acdrc` location). Overridden by CLI `[repoPath]` arg. |
+| `repoPath` | `string` | Default repo to audit (relative to `.acdrc`). Overridden by the CLI `[repoPath]` arg. |
 | `output` | `string` | Default Markdown output path. Overridden by `--output`. |
 | `json` | `boolean` | Default JSON mode. Overridden by `--json`. |
 | `failOn` | `"low" \| "medium" \| "high"` | Default fail threshold. Overridden by `--fail-on`. |
@@ -196,90 +221,33 @@ Add an optional `.acdrc` file at the repo root to customize audit behavior witho
 | Key | Type | Description |
 |-----|------|-------------|
 | `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. |
-| `disabledChecks` | `string[]` | Check categories to disable. Valid values: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`. Unknown values fail validation. |
-| `allowedMissingScripts` | `string[]` | Package script names that are allowed to be absent from `package.json` without raising a `command-alignment` issue. |
+| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`. Unknown values fail validation. |
+| `allowedMissingScripts` | `string[]` | Script names allowed to be absent from `package.json` without raising a `command-alignment` issue. |
 
-### CLI precedence
+Precedence is `CLI flags > .acdrc > defaults`. Config is loaded from the resolved repo path (or `cwd` if no path is given).
 
-`CLI flags > .acdrc > defaults`
+## Suppressions
 
-If you pass `--fail-on medium` on the CLI, it overrides `failOn` in `.acdrc`. Config is loaded from the resolved repo path (or `cwd` if no path is given).
+When a check fires on content you've already reviewed and accepted, silence that single finding with an inline comment instead of disabling the whole check.
 
-### Examples
+> Do not suppress high-severity issues without first understanding them. Suppressions are for confirmed false positives only.
 
-**Ignore legacy prompt files:**
-
-```json
-{
-  "rules": {
-    "ignoreFiles": ["docs/prompts/legacy/**", "prompts/archive/**"]
-  }
-}
-```
-
-**Allow a known missing CI script:**
-
-```json
-{
-  "rules": {
-    "allowedMissingScripts": ["validate", "ci"]
-  }
-}
-```
-
-**Always write a Markdown report and fail on high issues:**
-
-```json
-{
-  "audit": {
-    "output": "docs/agent-context-report.md",
-    "failOn": "high"
-  }
-}
-```
-
-## Suppressing known false positives
-
-Sometimes a check fires on content that you have already reviewed and accepted. You can silence individual findings with inline suppression comments without disabling the entire check for every file.
-
-> **Warning:** Do not suppress high-severity issues without first reading and understanding them. Suppressions are for confirmed false positives only.
-
-### Suppress the next line
-
-Place the comment on the line **immediately before** the flagged content:
+**Suppress the next line** — place the comment immediately before the flagged content:
 
 ```md
 <!-- acd-disable-next-line risky-language -->
 You may skip tests only in the emergency hotfix workflow.
 ```
 
-The suppression applies only to issues whose `line` equals the line directly after the comment. It does not affect issues on any other line.
-
-### Suppress all issues of a category in a file
-
-Place the comment anywhere in the file (typically near the top):
+**Suppress a whole category in a file** — place the comment anywhere in the file:
 
 ```md
 <!-- acd-disable-file placeholder-content -->
 ```
 
-This suppresses every issue of that category reported for that file.
+Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`.
 
-### Supported categories
-
-| Category | What it covers |
-|----------|----------------|
-| `risky-language` | Dangerous directives (skip tests, bypass auth, etc.) |
-| `placeholder-content` | TODO, TBD, lorem ipsum, blank sections |
-| `command-alignment` | Commands that don't match `package.json` scripts |
-| `contradictions` | Conflicting instructions across files |
-| `safety-boundaries` | Missing forbidden-change language |
-| `validation-commands` | Missing test/lint/typecheck guidance |
-| `final-reporting` | Missing final summary guidance |
-
-### Cross-file contradictions
-
-Contradiction issues involve two or more files. A file-level suppression in **one** file is not enough — **all** involved files must suppress that category:
+Contradiction issues span two or more files, so a file-level suppression in **all** involved files is required to silence them:
 
 ```md
 <!-- File: AGENTS.md -->
@@ -289,50 +257,69 @@ Contradiction issues involve two or more files. A file-level suppression in **on
 <!-- acd-disable-file contradictions -->
 ```
 
-### Unknown categories
-
-If you typo a category name, `acd` emits a low-severity `suppressions` issue to alert you:
+If you typo a category name, `acd` emits a low-severity `suppressions` issue so the mistake doesn't pass silently:
 
 ```
 [low] AGENTS.md — Unknown acd suppression category: "risky-languag"
 ```
 
-## Quality score
+## CI usage
 
-Every audit run produces a 0–100 score shown in the terminal and included in JSON and Markdown output.
+Use `--fail-on` to gate a pipeline. Exit codes: `0` = clean (or issues below threshold), `1` = issues at or above the `--fail-on` threshold.
 
-| Score | Grade |
-|-------|-------|
-| 90–100 | `excellent` |
-| 75–89 | `good` |
-| 50–74 | `needs-work` |
-| 0–49 | `risky` |
+```yaml
+# .github/workflows/agent-context.yml
+name: agent-context
+on: [push, pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npx agent-context-doctor audit --fail-on high
+```
 
-Deductions: **−20** per high issue, **−8** per medium, **−3** per low. Floor is 0.
+To produce a report artifact, add `--output docs/agent-context-report.md` (and `--json` if you also want machine-readable output).
+
+## Limitations
+
+`acd` matches patterns; it does not understand meaning. Treat its output as signals, not certainty.
+
+- Structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`) match against the whole file, so they report file-level issues with no line number.
+- Files where agents legitimately can't run `pnpm test` locally (e.g. a Copilot file used only in CI) will still be flagged by `validation-commands`. Suppress it with `disabledChecks` or a per-file comment once confirmed.
+- Only text files matching the known patterns above are read. Binary and generated files are skipped.
+- It checks how instructions are *written*, not whether an agent will follow them or whether the resulting code is correct. Human review still matters.
+
+## Related tools
+
+Part of a small, deterministic, local-first suite for making repositories safer for AI coding agents:
+
+- [agent-readiness-kit](https://github.com/alipajand/agent-readiness-kit) — audits whether a repository is ready for AI coding agents.
+- [agent-pr-reviewer-lite](https://github.com/alipajand/agent-pr-reviewer-lite) — flags risky PR diffs before merge.
+- [agent-readiness-action](https://github.com/alipajand/agent-readiness-action) — runs readiness audits in GitHub Actions.
 
 ## Development
 
 ```bash
 pnpm install
 pnpm dev audit          # run against this repo
-pnpm format             # auto-format
-pnpm format:check       # check formatting (runs in CI)
 pnpm test               # run tests
 pnpm typecheck          # type check
 pnpm build              # compile to dist/
+pnpm format             # auto-format
+pnpm format:check       # check formatting (runs in CI)
 ```
 
-## Non-goals
-
-- No LLM calls — all checks are deterministic pattern matching
-- No telemetry — nothing is sent anywhere
-- No web UI — terminal and file output only
-- No guarantee of correctness — this tool gives you signals, not certainty
-- No replacement for human review — agents still need human oversight
+See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the module layout, [docs/ROUTES.md](./docs/ROUTES.md) for the full CLI reference, and [CONTRIBUTING.md](./CONTRIBUTING.md) to add a new check.
 
 ## Security
 
-See [SECURITY.md](./SECURITY.md). To report a vulnerability, use [GitHub Security Advisories](https://github.com/alipajand/agent-context-doctor/security/advisories/new) — do not open a public issue.
+`acd` reads files from disk and writes only the report file you ask for. It makes no network calls, runs no commands found in the files it audits, and collects no telemetry. Markdown reports may contain short excerpts of your instruction files, so review them before sharing.
+
+See [SECURITY.md](./SECURITY.md) to report a vulnerability — use [GitHub Security Advisories](https://github.com/alipajand/agent-context-doctor/security/advisories/new), not a public issue.
 
 ## License
 

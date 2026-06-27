@@ -4,6 +4,8 @@ import path from 'node:path'
 const CONTEXT_PATTERNS = [
   'AGENTS.md',
   'CLAUDE.md',
+  '.claude/CLAUDE.md',
+  '.claude/commands/*.md',
   '.cursorrules',
   '.cursor/rules/*.mdc',
   '.github/copilot-instructions.md',

@@ -108,5 +108,4 @@ CLI command (audit / list / init)
 
 - `docs/ROUTES.md` — CLI command reference
 - `docs/API.md` — module contracts and exported types
-- `docs/DOGFOODING.md` — real-world audit results and false-positive history
 - `docs/RELEASE.md` — publish checklist and version policy
