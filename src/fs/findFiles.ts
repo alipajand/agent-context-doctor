@@ -4,7 +4,9 @@ import path from 'node:path'
 const CONTEXT_PATTERNS = [
   'AGENTS.md',
   'CLAUDE.md',
+  'claude.md',
   '.claude/CLAUDE.md',
+  '.claude/claude.md',
   '.claude/commands/*.md',
   '.cursorrules',
   '.cursor/rules/*.mdc',
