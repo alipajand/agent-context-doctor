@@ -14,13 +14,7 @@ export type ContextIssue = {
 }
 
 export type ContextFileKind =
-  | 'agents'
-  | 'claude'
-  | 'cursor'
-  | 'copilot'
-  | 'codex'
-  | 'prompt'
-  | 'unknown'
+  'agents' | 'claude' | 'cursor' | 'copilot' | 'codex' | 'prompt' | 'unknown'
 
 export type ContextFile = {
   path: string
