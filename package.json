@@ -54,7 +54,7 @@
     "commander": "^15.0.0",
     "fast-glob": "^3.3.2",
     "picocolors": "^1.1.1",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
