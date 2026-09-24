@@ -26,10 +26,11 @@ AI coding agents follow whatever their instruction files tell them. A file full 
 | **Safety boundaries** | Whether primary files include ask-before / forbidden-change language for auth, billing, database, and production |
 | **Validation commands** | Whether instructions tell agents to run tests, lint, or typecheck |
 | **Final reporting** | Whether instructions describe what to include in a final summary |
-| **Command alignment** | Commands referenced in instructions that don't match `package.json` scripts |
+| **Command alignment** | `pnpm`/`npm`/`yarn`/`bun` scripts and `make` targets referenced in instructions that don't exist. Built-in commands, workspace-targeted runs (`--filter`, `-C`, `workspace`), and prose ("use pnpm for everything") are ignored |
+| **Broken references** | Markdown links, inline-code paths (`docs/ARCHITECTURE.md`), and `@imports` that point at files that no longer exist |
 | **Contradictions** | Conflicting directives across two or more files |
 | **File access** | Context files that are broken symlinks, or symlinks pointing outside the audited directory (never read) |
-| **File size** | Context files over 1 MiB, which are reported instead of read |
+| **File size** | Primary instruction files over a budget (40 KB by default, `rules.maxFileBytes`), and context files over 1 MiB, which are reported instead of read |
 
 ### Severity and score
 
@@ -227,8 +228,9 @@ Add an optional `.acdrc` file at the repo root to set defaults without changing 
 | Key | Type | Description |
 |-----|------|-------------|
 | `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. |
-| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`. Unknown values fail validation. |
+| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`, `broken-references`, `file-size`. Unknown values fail validation. |
 | `allowedMissingScripts` | `string[]` | Script names allowed to be absent from `package.json` without raising a `command-alignment` issue. |
+| `maxFileBytes` | `number` | Size budget for primary instruction files (default `40000`). Larger files get a low `file-size` issue. |
 
 Precedence is `CLI flags > .acdrc > defaults`. Config is loaded from the resolved repo path (or `cwd` if no path is given).
 
@@ -251,7 +253,7 @@ You may skip tests only in the emergency hotfix workflow.
 <!-- acd-disable-file placeholder-content -->
 ```
 
-Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`, `hidden-characters`, `secrets`.
+Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`, `hidden-characters`, `secrets`, `broken-references`, `file-size`.
 
 Contradiction issues span two or more files, so a file-level suppression in **all** involved files is required to silence them:
 

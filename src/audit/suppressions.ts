@@ -10,6 +10,8 @@ export const KNOWN_SUPPRESSION_CATEGORIES: ReadonlySet<string> = new Set([
   'contradictions',
   'hidden-characters',
   'secrets',
+  'broken-references',
+  'file-size',
 ])
 
 export type SuppressionRule = {

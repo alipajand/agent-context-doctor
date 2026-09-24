@@ -196,6 +196,7 @@ program
         ignoreFiles: config?.rules?.ignoreFiles,
         disabledChecks: config?.rules?.disabledChecks,
         allowedMissingScripts: config?.rules?.allowedMissingScripts,
+        maxFileBytes: config?.rules?.maxFileBytes,
       })
 
       if (baselinePath) {

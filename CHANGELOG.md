@@ -10,6 +10,9 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Added
 
+- `broken-references` check: Markdown links, inline-code paths, and Claude `@imports` that point at files that no longer exist. Targets are only probed inside the repository; `.js` references match their `.ts` sources.
+- `file-size` budget: primary instruction files over 40 KB (configurable with `rules.maxFileBytes`) get a low issue, since agents load them into every session.
+- `command-alignment` also checks `make <target>` references against the Makefile.
 - `--format terminal|json|markdown|sarif|github` (and `audit.format` in `.acdrc`). SARIF 2.1.0 uploads to GitHub code scanning; `github` prints workflow annotations that appear inline on pull requests. `--json` still works.
 - `--min-score <n>` (and `audit.minScore`) to fail when the score drops below a threshold.
 - `--baseline <file>` (and `audit.baseline`): issues already listed in an earlier `acd audit --json` report are marked known and do not trigger `--fail-on`, so existing repositories can adopt `acd` without fixing everything first. Issues carry a line-independent `fingerprint`.
@@ -47,6 +50,7 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Fixed
 
+- `command-alignment` reported prose such as "use pnpm for everything" (`for`), flags such as `pnpm -C dir test` (`-C`) and `--filter`, built-ins such as `pnpm exec`, `pnpm dlx`, `yarn workspace`, and `bun test`, and a second command on the same line was swallowed by the first. Workspace-targeted runs are now skipped, since their scripts live in another package.
 - The structural checks (safety boundaries, validation commands, final reporting) flagged every primary file on its own. A `CLAUDE.md` that just says "Follow AGENTS.md" lost up to 19 points, and each file in a `.cursor/rules/` set had to repeat every section. Guidance now counts when it appears in the file, in a context file it references, or in another primary file for the same tool. Nested `AGENTS.md` files get content checks only.
 - `risky-language` and `contradictions` treated safety guidance such as "Never skip tests" or "You should never bypass auth" as the risky instruction it forbids. Only "not" directly before the phrase was recognized as negation; the check now looks for negation anywhere earlier in the same clause.
 - `command-alignment` no longer treats `Object.prototype` members such as `constructor` as existing scripts, and ignores malformed `scripts` fields instead of crashing.

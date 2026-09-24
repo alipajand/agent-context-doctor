@@ -239,3 +239,26 @@ describe('auditRepo structural checks across related files', () => {
     expect(nested.map((i) => i.category)).toEqual(['risky-language'])
   })
 })
+
+describe('auditRepo file-size budget', () => {
+  const guidance =
+    'Run pnpm test. Ask before auth changes. Final report: files changed, commands run.'
+
+  it('flags a primary file over the default budget as low', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), `${guidance}\n${'x'.repeat(41_000)}`)
+    const result = await auditRepo(tmpDir)
+    const issue = result.issues.find((i) => i.category === 'file-size')
+    expect(issue?.severity).toBe('low')
+    expect(issue?.message).toContain('over the 40 KB budget')
+  })
+
+  it('respects a custom maxFileBytes and skips supplementary files', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), `${guidance}\n${'x'.repeat(2_000)}`)
+    await fs.mkdir(path.join(tmpDir, 'docs', 'prompts'), { recursive: true })
+    await fs.writeFile(path.join(tmpDir, 'docs', 'prompts', 'big.md'), 'y'.repeat(5_000))
+    const result = await auditRepo(tmpDir, { maxFileBytes: 1_000 })
+    expect(result.issues.filter((i) => i.category === 'file-size').map((i) => i.file)).toEqual([
+      'AGENTS.md',
+    ])
+  })
+})

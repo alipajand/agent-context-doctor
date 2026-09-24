@@ -135,7 +135,8 @@ A JSON file at the root of the audited repository. All fields are optional.
   "rules": {
     "ignoreFiles": ["docs/examples/**"],     // Glob patterns to exclude from auditing
     "disabledChecks": ["validation-commands"], // Check IDs to skip entirely
-    "allowedMissingScripts": ["deploy"]      // Package scripts that are allowed to be missing
+    "allowedMissingScripts": ["deploy"],     // Package scripts that are allowed to be missing
+    "maxFileBytes": 40000                    // Size budget for primary instruction files
   }
 }
 ```
@@ -151,3 +152,5 @@ A JSON file at the root of the audited repository. All fields are optional.
 - `contradictions`
 - `hidden-characters`
 - `secrets`
+- `broken-references`
+- `file-size`
