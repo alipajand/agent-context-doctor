@@ -170,7 +170,9 @@ function filterSuppressedIssues(
 ```ts
 const KNOWN_SUPPRESSION_CATEGORIES: Set<string>
 // Contains: 'placeholder-content', 'risky-language', 'command-alignment',
-//           'safety-boundaries', 'validation-commands', 'final-reporting', 'contradictions'
+//           'safety-boundaries', 'validation-commands', 'final-reporting', 'contradictions',
+//           'hidden-characters', 'secrets', 'broken-references', 'file-size', 'frontmatter',
+//           'agent-config'
 ```
 
 ---
@@ -189,6 +191,11 @@ Each check is a pure function that returns `ContextIssue[]`. An empty array mean
 | `checkValidationCommands` | `(filePath, content) => ContextIssue[]` |
 | `checkFinalReporting` | `(filePath, content) => ContextIssue[]` |
 | `checkContradictions` | `(fileContents: Array<{path, content}>) => ContextIssue[]` |
+| `checkAgentConfig` | `(filePath, content) => ContextIssue[]` — JSON/JSONC agent settings and MCP configs |
+| `claudeSettingsScripts` | `(content) => string[]` — repo-relative scripts that `.claude/settings.json` hooks and status line run |
+| `checkClaudeArtifact` | `(filePath, content) => ContextIssue[]` — Claude commands, skills, subagents, and `CLAUDE.md` imports |
+| `checkClaudeScript` | `(filePath, content) => ContextIssue[]` — a hook or status line script, line by line |
+| `findShellRisks` | `(command) => Array<{severity, label}>` — shared shell-command risk patterns, one entry per kind |
 
 ---
 

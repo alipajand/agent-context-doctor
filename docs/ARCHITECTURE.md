@@ -56,7 +56,10 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkFileSize` | `fileSize.ts` | Primary instruction files over the size budget |
 | `checkMakeTargets` | `commandAlignment.ts` | `make` targets referenced in instructions but missing from the Makefile |
 | `checkFrontmatter` | `frontmatter.ts` | Cursor rules, Claude subagents/skills, and Copilot instructions whose frontmatter keeps them from loading |
-| `checkAgentConfig` | `agentConfig.ts` | Claude Code permissions and MCP server configs: bypass mode, unrestricted shell, unpinned packages, plain HTTP, hardcoded credentials |
+| `checkAgentConfig` | `agentConfig.ts`, `claudeSettings.ts` | Claude Code settings (permissions, `additionalDirectories`, env overrides, hooks, status line, credential helpers) and MCP server configs: bypass mode, rules that run any code, endpoint overrides, unpinned packages, plain HTTP, hardcoded credentials |
+| `checkClaudeArtifact` | `claudeArtifacts.ts` | Claude commands and skills (`allowed-tools`, `` !`cmd` `` injection), subagents with `permissionMode: bypassPermissions`, and `CLAUDE.md` imports of credential files or files outside the repo |
+| `checkClaudeScript` | `claudeArtifacts.ts` | Repository scripts that settings hooks and the status line run; `auditRepo` reads them through the same repo-confined reader as config files |
+| `findShellRisks` | `shellRisk.ts` | Shared shell-command patterns (remote script execution, uploads, raw sockets, decoded payloads, deleting root/home, credential reads, unpinned runners). Commands are split into pipeline stages first so matching stays linear |
 | `checkSkippedFile` | `skippedFiles.ts` | Context files that were detected but not read: links outside the repo, broken links, or files over 1 MiB |
 
 ## Scoring model

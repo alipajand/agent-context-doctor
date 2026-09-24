@@ -100,6 +100,7 @@ const PRIMARY_FILES = new Set([
 ])
 
 const PRIMARY_DIRECTORIES = [
+  '.claude/rules/',
   '.cursor/rules/',
   '.windsurf/rules/',
   '.clinerules/',

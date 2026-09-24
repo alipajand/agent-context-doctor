@@ -18,7 +18,12 @@ import { checkSecrets } from './checks/secrets.js'
 import { fingerprintIssue } from './baseline.js'
 import { checkBrokenReferences, extractFileReferences } from './checks/brokenReferences.js'
 import { checkFileSize, DEFAULT_MAX_FILE_BYTES } from './checks/fileSize.js'
-import { AGENT_CONFIG_FILES, checkAgentConfig } from './checks/agentConfig.js'
+import {
+  AGENT_CONFIG_FILES,
+  checkAgentConfig,
+  claudeSettingsScripts,
+} from './checks/agentConfig.js'
+import { checkClaudeArtifact, checkClaudeScript } from './checks/claudeArtifacts.js'
 import { checkFrontmatter } from './checks/frontmatter.js'
 import { isWithin } from '../fs/safePath.js'
 import fs from 'node:fs/promises'
@@ -186,6 +191,10 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
       fileIssues.push(...checkFrontmatter(filePath, content))
     }
 
+    if (!disabled.has('agent-config')) {
+      fileIssues.push(...checkClaudeArtifact(filePath, content))
+    }
+
     if (!disabled.has('placeholder-content')) {
       fileIssues.push(...checkPlaceholderContent(filePath, content))
     }
@@ -238,7 +247,15 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
   if (!disabled.has('agent-config')) {
     for (const rel of AGENT_CONFIG_FILES) {
       const content = await readRepoFile(absoluteRepo, rel)
-      if (content !== '') issues.push(...checkAgentConfig(path.normalize(rel), content))
+      if (content === '') continue
+      issues.push(...checkAgentConfig(path.normalize(rel), content))
+      if (rel !== '.claude/settings.json') continue
+      for (const script of claudeSettingsScripts(content)) {
+        const scriptContent = await readRepoFile(absoluteRepo, script)
+        if (scriptContent !== '') {
+          issues.push(...checkClaudeScript(path.normalize(script), scriptContent))
+        }
+      }
     }
   }
 

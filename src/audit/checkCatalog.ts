@@ -86,6 +86,7 @@ export const CHECKS: readonly CheckInfo[] = [
     id: 'agent-config',
     severity: 'high/medium/low',
     appliesTo: 'agent config files',
-    description: 'Risky Claude Code permissions and MCP servers (unpinned, plain HTTP, secrets)',
+    description:
+      'Risky Claude Code settings, hooks, commands, skills, and subagents, and MCP servers (unpinned, plain HTTP, secrets)',
   },
 ]
