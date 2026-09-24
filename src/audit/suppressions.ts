@@ -8,6 +8,8 @@ export const KNOWN_SUPPRESSION_CATEGORIES: ReadonlySet<string> = new Set([
   'risky-language',
   'command-alignment',
   'contradictions',
+  'hidden-characters',
+  'secrets',
 ])
 
 export type SuppressionRule = {

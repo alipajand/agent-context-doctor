@@ -10,6 +10,9 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Added
 
+- `hidden-characters` check: flags invisible Unicode in instruction files — tag characters (high, with the hidden text decoded), bidirectional controls (high), and zero-width characters (medium). Legitimate ZWJ in emoji and ZWNJ in scripts such as Persian are not flagged.
+- `secrets` check: flags AWS, GitHub, Anthropic, OpenAI, Stripe, Slack, and npm tokens, private keys (high), and credential-looking assignments (medium). Evidence is redacted and obvious placeholders are ignored.
+- `risky-language` now also flags `--no-verify`, force pushes, skipped agent permission prompts, disabled TLS verification, deleting failing tests (high), and pushing directly to main, merging without review, `curl | sh`, `chmod 777`, and suppressing type or lint errors (medium).
 - `docs/ARCHITECTURE.md` — system design and module boundary reference
 - `docs/ROUTES.md` — CLI command reference with all flags and exit codes
 - `docs/API.md` — module contracts and exported type reference
@@ -39,6 +42,7 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Fixed
 
+- `risky-language` and `contradictions` treated safety guidance such as "Never skip tests" or "You should never bypass auth" as the risky instruction it forbids. Only "not" directly before the phrase was recognized as negation; the check now looks for negation anywhere earlier in the same clause.
 - `command-alignment` no longer treats `Object.prototype` members such as `constructor` as existing scripts, and ignores malformed `scripts` fields instead of crashing.
 
 ---

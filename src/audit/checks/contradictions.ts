@@ -1,4 +1,5 @@
 import type { ContextIssue, Severity } from '../../types.js'
+import { isNegated } from '../negation.js'
 
 type ContradictionGroup = {
   name: string
@@ -84,13 +85,25 @@ type PhraseMatch = {
   file: string
 }
 
-function findMatches(files: FileContent[], patterns: RegExp[]): PhraseMatch[] {
+// Opposing phrases only count when permissive: "Never skip tests" agrees with
+// "always run tests" rather than contradicting it.
+function findMatches(
+  files: FileContent[],
+  patterns: RegExp[],
+  ignoreNegated = false,
+): PhraseMatch[] {
   const matches: PhraseMatch[] = []
   for (const { path, content } of files) {
     for (const pattern of patterns) {
-      const match = pattern.exec(content)
-      if (match) {
-        matches.push({ phrase: match[0], file: path })
+      const global = new RegExp(pattern.source, `${pattern.flags}g`)
+      for (const line of content.split('\n')) {
+        const match = [...line.matchAll(global)].find(
+          (m) => !ignoreNegated || !isNegated(line, m.index),
+        )
+        if (match) {
+          matches.push({ phrase: match[0], file: path })
+          break
+        }
       }
     }
   }
@@ -102,7 +115,7 @@ export function checkContradictions(files: FileContent[]): ContextIssue[] {
 
   for (const group of CONTRADICTION_GROUPS) {
     const strictMatches = findMatches(files, group.strictPhrases)
-    const opposingMatches = findMatches(files, group.opposingPhrases)
+    const opposingMatches = findMatches(files, group.opposingPhrases, true)
 
     if (strictMatches.length === 0 || opposingMatches.length === 0) continue
 
