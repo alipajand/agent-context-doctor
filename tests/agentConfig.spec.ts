@@ -34,13 +34,16 @@ describe('checkAgentConfig — Claude Code settings', () => {
   it.each(['Bash', 'Bash(*)', 'Bash(:*)'])('flags unrestricted shell permission %s', (rule) => {
     const issues = checkAgentConfig(file, json({ permissions: { allow: [rule] } }))
     expect(issues.map((i) => i.message)).toContain(
-      `Claude Code permission "${rule}" allows any shell command without asking`,
+      `Claude Code permission "${rule}" lets the agent run any code without asking`,
     )
   })
 
   it('accepts scoped shell permissions', () => {
     expect(
-      checkAgentConfig(file, json({ permissions: { allow: ['Bash(pnpm test:*)', 'Read'] } })),
+      checkAgentConfig(
+        file,
+        json({ permissions: { allow: ['Bash(pnpm test:*)', 'Read'], deny: ['Read(./.env)'] } }),
+      ),
     ).toEqual([])
   })
 

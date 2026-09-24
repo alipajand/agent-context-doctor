@@ -10,6 +10,14 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Added
 
+- Claude Code security checks under `agent-config`:
+  - Settings allow rules that run any code (shells, interpreters, `sudo`, package runners, bare `git`/package managers) (high), plus network, destructive, and unrestricted `WebFetch` rules (medium).
+  - File rules and `additionalDirectories` that reach outside the project; a low issue when no deny rule covers `.env`.
+  - Env overrides that redirect or weaken the session (`ANTHROPIC_BASE_URL` to a third-party host, proxies, `NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_OPTIONS` preloads, `BASH_ENV`, `PATH`).
+  - Hooks, `statusLine`, credential helpers, and MCP `headersHelper` and start commands checked for remote script execution, uploads, raw sockets, decoded payloads, deleting root or home, credential reads, and unpinned runners. Repository scripts they run are read (confined to the repo) and checked line by line.
+  - Commands and skills whose `allowed-tools` approve any code or whose `` !`cmd` `` blocks do any of the above; subagents with `permissionMode: bypassPermissions`; `CLAUDE.md` imports of credential files or of files outside the repository.
+- `agent-config` findings can be suppressed with `acd-disable-*` comments like other categories.
+- Detection for `.claude/rules/**/*.md` (treated as primary instructions, like `.cursor/rules/`) and `.claude/output-styles/**/*.md`.
 - `frontmatter` check: Cursor `.mdc` rules that can never be applied (no `alwaysApply: true`, `globs`, or `description`; medium) or have no frontmatter (low), Claude subagents and skills missing `name`/`description` (medium), Copilot `.instructions.md` without `applyTo` (low), and unclosed frontmatter blocks.
 - `agent-config` check for committed agent settings. Claude Code: `bypassPermissions` and unrestricted `Bash` allow rules (high), `enableAllProjectMcpServers` (medium). MCP configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, `.roo/mcp.json`): hardcoded credentials in `env`/headers (high, redacted), `npx`/`uvx` packages without a pinned version and plain-HTTP remote servers (medium). JSONC is supported, and config files that resolve outside the repository are not read.
 - `acd checks` lists every check ID with its severity and description (`--json` for machine output).

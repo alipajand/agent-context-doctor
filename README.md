@@ -30,7 +30,7 @@ AI coding agents follow whatever their instruction files tell them. A file full 
 | **Broken references** | Markdown links, inline-code paths (`docs/ARCHITECTURE.md`), and `@imports` that point at files that no longer exist |
 | **Contradictions** | Conflicting directives across two or more files |
 | **Frontmatter** | Tool rule files that are silently ignored: Cursor `.mdc` rules with no `alwaysApply: true`, `globs`, or `description` (or no frontmatter), Claude subagents and skills without `name` and `description`, Copilot `.instructions.md` without `applyTo`, and unclosed frontmatter |
-| **Agent config** | Committed agent settings: Claude Code `bypassPermissions`, unrestricted `Bash` permissions, auto-trusted MCP servers, and MCP servers in `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, or `.roo/mcp.json` that run unpinned packages (`npx pkg` without a version), connect over plain HTTP, or hardcode credentials |
+| **Agent config** | Committed agent settings and the Claude Code files that can run commands. See [Claude Code security checks](#claude-code-security-checks). Also MCP servers in `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, or `.roo/mcp.json` that run unpinned packages (`npx pkg` without a version), start with a remote script, run a headers helper, connect over plain HTTP, or hardcode credentials |
 | **File access** | Context files that are broken symlinks, or symlinks pointing outside the audited directory (never read) |
 | **File size** | Primary instruction files over a budget (40 KB by default, `rules.maxFileBytes`), and context files over 1 MiB, which are reported instead of read |
 
@@ -105,12 +105,25 @@ acd checks                                 # list every check and its ID
 
 ### Auditing a repo with Claude files
 
-`acd` audits Claude Code instructions wherever they live — a root `CLAUDE.md`, a `.claude/CLAUDE.md`, or command files such as `.claude/commands/review.md`:
+`acd` audits Claude Code instructions wherever they live — a root `CLAUDE.md`, a `.claude/CLAUDE.md`, `.claude/rules/`, output styles, or command files such as `.claude/commands/review.md`:
 
 ```bash
 acd audit
 acd list
 ```
+
+#### Claude Code security checks
+
+A repository's Claude Code setup can run commands on a contributor's machine the moment they open the project, so `acd` reads it the way an attacker would write it. All of these report under the `agent-config` check.
+
+| Where | What is flagged |
+|-------|-----------------|
+| `.claude/settings.json` permissions | `defaultMode: bypassPermissions`; allow rules that run any code (`Bash`, `Bash(*)`, shells, interpreters, `sudo`, `npx`, bare `git`/`pnpm`/`npm`, `pnpm dlx`, `npm exec`) (high); network commands (`curl`, `wget`, `ssh`), destructive commands (`rm -rf`, `git push`, `git reset --hard`), unrestricted `WebFetch` (medium); `Read`/`Edit` rules on home or absolute paths; `additionalDirectories` that open `/`, `~`, or paths outside the repo; no deny rule for `.env` (low) |
+| `.claude/settings.json` env | `ANTHROPIC_BASE_URL` pointing at a host other than Anthropic or localhost, remote proxies, `NODE_TLS_REJECT_UNAUTHORIZED=0`, `NODE_OPTIONS` preloads, `BASH_ENV` (high); `PATH` overrides (medium); hardcoded credentials (high, redacted) |
+| Hooks, `statusLine`, credential helpers | Commands that pipe a download into a shell, upload data, open raw sockets, decode hidden payloads, delete root or home (high), read `~/.ssh`/`~/.aws`-style credentials or run unpinned `npx` packages (medium). Committed `apiKeyHelper` and cloud auth helpers (medium). Repository scripts these settings run, such as `"$CLAUDE_PROJECT_DIR"/.claude/hooks/format.sh`, are read (never through links outside the repo) and checked line by line |
+| Commands and skills | `allowed-tools` that approve any code, and `` !`cmd` `` or ` ```! ` blocks, which run before the model reads the file, with any of the command risks above |
+| Subagents | `permissionMode: bypassPermissions` (high) |
+| `CLAUDE.md` imports | `@` imports of credential files such as `@~/.ssh/id_rsa` or `@.env` (high), and imports from outside the repository (low) |
 
 ### A risky instruction, and a safer rewrite
 
@@ -170,7 +183,7 @@ Issues:
 | Tool | Files | Kind |
 |------|-------|------|
 | Cross-tool | `AGENTS.md`, `AGENT.md`, and nested `**/AGENTS.md` | `agents` |
-| Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, nested `**/CLAUDE.md`, `.claude/commands/**/*.md`, `.claude/agents/**/*.md`, `.claude/skills/**/SKILL.md` | `claude` |
+| Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, nested `**/CLAUDE.md`, `.claude/rules/**/*.md`, `.claude/commands/**/*.md`, `.claude/agents/**/*.md`, `.claude/skills/**/SKILL.md`, `.claude/output-styles/**/*.md` | `claude` |
 | Gemini | `GEMINI.md`, nested `**/GEMINI.md`, `.gemini/styleguide.md` | `gemini` |
 | Cursor | `.cursorrules`, `.cursor/rules/**/*.mdc`, `.cursor/rules/**/*.md` | `cursor` |
 | GitHub Copilot | `.github/copilot-instructions.md`, `.github/prompts/**/*.prompt.md`, `.github/chatmodes/**/*.chatmode.md`, `.github/agents/**/*.md` | `copilot` |
@@ -190,7 +203,7 @@ Root files match case-insensitively (`claude.md` and `CLAUDE.md` are both detect
 
 ### Primary and supplementary files
 
-The structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`) apply to the files a tool loads as its standing instructions: root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, `.claude/CLAUDE.md`, Copilot's main instructions, and rule directories such as `.cursor/rules/`. Nested `AGENTS.md` files, commands, subagents, skills, and prompt libraries are supplementary: they get the content checks (risky language, secrets, hidden characters, placeholders, commands) but not the structural ones.
+The structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`) apply to the files a tool loads as its standing instructions: root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, `.claude/CLAUDE.md`, Copilot's main instructions, and rule directories such as `.cursor/rules/` and `.claude/rules/`. Nested `AGENTS.md` files, commands, subagents, skills, and prompt libraries are supplementary: they get the content checks (risky language, secrets, hidden characters, placeholders, commands) but not the structural ones.
 
 A primary file counts as covered when the guidance appears in the file itself, in a context file it references (for example a `CLAUDE.md` that says "Follow AGENTS.md" or imports `@AGENTS.md`), or in another primary file for the same tool (a `.cursor/rules/` set is evaluated as a whole).
 
@@ -256,7 +269,7 @@ You may skip tests only in the emergency hotfix workflow.
 <!-- acd-disable-file placeholder-content -->
 ```
 
-Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`, `hidden-characters`, `secrets`, `broken-references`, `file-size`, `frontmatter`.
+Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`, `hidden-characters`, `secrets`, `broken-references`, `file-size`, `frontmatter`, `agent-config`.
 
 Contradiction issues span two or more files, so a file-level suppression in **all** involved files is required to silence them:
 

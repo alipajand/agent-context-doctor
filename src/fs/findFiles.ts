@@ -17,6 +17,8 @@ export const CONTEXT_PATTERNS = [
   '.claude/commands/**/*.md',
   '.claude/agents/**/*.md',
   '.claude/skills/**/SKILL.md',
+  '.claude/rules/**/*.md',
+  '.claude/output-styles/**/*.md',
   // Cursor
   '.cursorrules',
   '.cursor/rules/**/*.mdc',

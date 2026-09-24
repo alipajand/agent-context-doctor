@@ -1,6 +1,15 @@
-import type { ContextIssue, Severity } from '../../types.js'
+import type { ContextIssue } from '../../types.js'
 import { getLineEvidence } from '../evidence.js'
 import { checkSecrets } from './secrets.js'
+import {
+  asRecord,
+  asStrings,
+  claudeSettingsFindings,
+  clip,
+  referencedScripts,
+  type ConfigFinding as Finding,
+} from './claudeSettings.js'
+import { findShellRisks } from './shellRisk.js'
 
 /** Agent configuration files checked by `checkAgentConfig`, relative to the repo root. */
 export const AGENT_CONFIG_FILES = [
@@ -11,8 +20,6 @@ export const AGENT_CONFIG_FILES = [
   '.gemini/settings.json',
   '.roo/mcp.json',
 ] as const
-
-type Finding = { severity: Severity; message: string; recommendation: string; needle?: string }
 
 /**
  * Remove // and /* *\/ comments and trailing commas outside strings, so
@@ -54,59 +61,6 @@ export function stripJsonComments(text: string): string {
   return out
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
-function asStrings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
-}
-
-const UNRESTRICTED_SHELL = /^Bash(?:\((?:\*|:\*|\*:\*)?\))?$/
-
-function claudeSettingsFindings(settings: Record<string, unknown>): Finding[] {
-  const findings: Finding[] = []
-  const permissions = asRecord(settings.permissions)
-
-  if (permissions?.defaultMode === 'bypassPermissions') {
-    findings.push({
-      severity: 'high',
-      message: 'Claude Code is set to bypassPermissions: every tool runs without asking',
-      recommendation:
-        'Remove defaultMode "bypassPermissions" from the shared settings. Grant specific tools with permissions.allow instead.',
-      needle: 'bypassPermissions',
-    })
-  }
-
-  for (const rule of asStrings(permissions?.allow)) {
-    if (UNRESTRICTED_SHELL.test(rule.replace(/\s+/g, ''))) {
-      findings.push({
-        severity: 'high',
-        message: `Claude Code permission "${rule}" allows any shell command without asking`,
-        recommendation:
-          'Allow specific commands instead, for example "Bash(pnpm test:*)", and keep destructive commands behind a prompt.',
-        needle: rule,
-      })
-    }
-  }
-
-  findings.push(...credentialFindings('Claude Code settings', asRecord(settings.env)))
-
-  if (settings.enableAllProjectMcpServers === true) {
-    findings.push({
-      severity: 'medium',
-      message: 'Claude Code auto-approves every MCP server defined in the repository',
-      recommendation:
-        'Remove enableAllProjectMcpServers and approve servers individually (enabledMcpjsonServers), so a new server added in a pull request is not trusted automatically.',
-      needle: 'enableAllProjectMcpServers',
-    })
-  }
-
-  return findings
-}
-
 // Launchers that download and run a package by name at start-up.
 const PACKAGE_RUNNERS = new Set(['npx', 'bunx', 'pnpx', 'uvx', 'pipx'])
 
@@ -143,6 +97,7 @@ function credentialFindings(where: string, entries: Record<string, unknown> | nu
       recommendation:
         'Reference the credential through an environment variable (for example "${env:API_KEY}") instead of committing it, and rotate the exposed value.',
       needle: value,
+      secret: true,
     })
   }
   return findings
@@ -173,6 +128,36 @@ function mcpServerFindings(name: string, server: Record<string, unknown>): Findi
     }
   }
 
+  const commandLine = [typeof server.command === 'string' ? server.command : '', ...args].join(' ')
+  for (const risk of findShellRisks(commandLine)) {
+    if (risk.label.startsWith('runs a package')) continue
+    findings.push({
+      severity: risk.severity,
+      message: `MCP server "${name}" ${risk.label} when it starts`,
+      recommendation: 'Start MCP servers from a pinned package or a reviewed local script.',
+      needle: typeof server.command === 'string' ? server.command : undefined,
+    })
+  }
+
+  const headersHelper = typeof server.headersHelper === 'string' ? server.headersHelper : undefined
+  if (headersHelper) {
+    findings.push({
+      severity: 'medium',
+      message: `MCP server "${name}" runs "${clip(headersHelper)}" to produce request headers`,
+      recommendation:
+        'A headers helper runs on your machine each time the server connects. Keep it in user settings, or make sure it only reads a local credential.',
+      needle: 'headersHelper',
+    })
+    for (const risk of findShellRisks(headersHelper)) {
+      findings.push({
+        severity: risk.severity,
+        message: `MCP server "${name}" headersHelper ${risk.label}`,
+        recommendation: 'Remove the command, or replace it with a reviewed local script.',
+        needle: 'headersHelper',
+      })
+    }
+  }
+
   const url = typeof server.url === 'string' ? server.url : undefined
   if (
     url &&
@@ -197,9 +182,10 @@ function lineOf(content: string, needle: string | undefined): number | undefined
 }
 
 /**
- * Risky settings in committed agent configuration: Claude Code permissions and
- * MCP server definitions. Hardcoded credentials are reported through the
- * secrets patterns, with redacted evidence.
+ * Risky settings in committed agent configuration: Claude Code permissions,
+ * hooks, environment, and credential helpers, and MCP server definitions.
+ * Hardcoded credentials are reported through the secrets patterns, with
+ * redacted evidence.
  */
 export function checkAgentConfig(filePath: string, content: string): ContextIssue[] {
   let parsed: unknown
@@ -223,6 +209,7 @@ export function checkAgentConfig(filePath: string, content: string): ContextIssu
 
   if (filePath.replace(/\\/g, '/').endsWith('.claude/settings.json')) {
     findings.push(...claudeSettingsFindings(root))
+    findings.push(...credentialFindings('Claude Code settings', asRecord(root.env)))
   }
 
   const servers = asRecord(root.mcpServers) ?? asRecord(root.servers) ?? {}
@@ -244,7 +231,7 @@ export function checkAgentConfig(filePath: string, content: string): ContextIssu
   const issues: ContextIssue[] = []
   findings.forEach((finding, i) => {
     const line = lineOf(content, finding.needle)
-    const isCredential = finding.severity === 'high' && finding.message.includes('hardcodes')
+    const isCredential = finding.secret === true
     if (isCredential && line !== undefined && secretLines.has(line)) return
     issues.push({
       id: `agent-config-${filePath}-${i}`,
@@ -268,4 +255,14 @@ function evidenceFor(content: string, line: number, secret: string | undefined):
   if (!secret) return evidence
   const masked = `${secret.slice(0, 4)}${'*'.repeat(Math.min(12, Math.max(0, secret.length - 4)))}`
   return evidence.split(secret).join(masked)
+}
+
+/** Repository scripts that `.claude/settings.json` runs from hooks or the status line. */
+export function claudeSettingsScripts(content: string): string[] {
+  try {
+    const settings = asRecord(JSON.parse(stripJsonComments(content)))
+    return settings ? referencedScripts(settings) : []
+  } catch {
+    return []
+  }
 }
