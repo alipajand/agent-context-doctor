@@ -12,13 +12,19 @@ const VALID_CHECKS = [
   'secrets',
 ] as const
 
+export const OUTPUT_FORMATS = ['terminal', 'json', 'markdown', 'sarif', 'github'] as const
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number]
+
 export const AcdRcSchema = z.object({
   audit: z
     .object({
       repoPath: z.string().optional(),
       output: z.string().optional(),
       json: z.boolean().optional(),
+      format: z.enum(OUTPUT_FORMATS).optional(),
       failOn: z.enum(['low', 'medium', 'high']).optional(),
+      minScore: z.number().int().min(0).max(100).optional(),
+      baseline: z.string().optional(),
     })
     .optional(),
   rules: z

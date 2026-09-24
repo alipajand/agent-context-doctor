@@ -21,7 +21,10 @@ Audit agent context files in a repository for quality, safety, contradictions, p
 | `--json` | boolean | Output the full `AuditResult` as JSON to stdout instead of terminal output |
 | `--output <path>` | string | Write a Markdown report to this path. Relative paths resolve under `repoPath`; the result must stay inside the audited repository |
 | `--allow-outside` | boolean | Allow `--output` to write outside the audited repository. Applies only to a path passed on the command line, never to `audit.output` from `.acdrc` |
-| `--fail-on <severity>` | `low\|medium\|high` | Exit non-zero if any issue at or above this severity is found |
+| `--format <format>` | `terminal\|json\|markdown\|sarif\|github` | Output format for stdout. `--json` is shorthand for `--format json` |
+| `--fail-on <severity>` | `low\|medium\|high` | Exit non-zero if any issue at or above this severity is found (issues listed in `--baseline` are ignored) |
+| `--min-score <n>` | integer 0–100 | Exit non-zero if the score is below `n` |
+| `--baseline <file>` | string | A previous `acd audit --json` report. Its issues are marked known and do not trigger `--fail-on` |
 
 **Config precedence** (highest to lowest): CLI flag → `.acdrc` field → default.
 
@@ -30,7 +33,7 @@ Audit agent context files in a repository for quality, safety, contradictions, p
 | Code | Meaning |
 | --- | --- |
 | `0` | Audit completed (no issues above `--fail-on` threshold, or `--fail-on` not set) |
-| `1` | Config error, invalid `--fail-on` value, report path outside the repository, or threshold exceeded |
+| `1` | Config or baseline error, invalid `--format`/`--fail-on`/`--min-score` value, report path outside the repository, `--fail-on` threshold exceeded, or score below `--min-score` |
 
 **Examples**
 
@@ -124,7 +127,10 @@ A JSON file at the root of the audited repository. All fields are optional.
     "repoPath": ".",          // Override the repo path (relative to .acdrc; must stay inside that directory)
     "json": true,             // Equivalent to --json
     "output": "report.md",    // Equivalent to --output; always confined to the audited repo
-    "failOn": "high"          // Equivalent to --fail-on
+    "failOn": "high",         // Equivalent to --fail-on
+    "format": "github",       // Equivalent to --format
+    "minScore": 80,           // Equivalent to --min-score
+    "baseline": ".acd-baseline.json" // Equivalent to --baseline; must stay inside the repo
   },
   "rules": {
     "ignoreFiles": ["docs/examples/**"],     // Glob patterns to exclude from auditing

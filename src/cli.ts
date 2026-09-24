@@ -14,7 +14,12 @@ import { loadConfig } from './config/loadConfig.js'
 import { initRepo } from './init/initRepo.js'
 import { AGENTS_TEMPLATE } from './init/template.js'
 import { VERSION } from './version.js'
-import type { Severity } from './types.js'
+import { applyBaseline, BaselineError, loadBaseline } from './audit/baseline.js'
+import { OUTPUT_FORMATS } from './config/schema.js'
+import type { OutputFormat } from './config/schema.js'
+import { toGithubAnnotations } from './report/githubReport.js'
+import { toSarifReport } from './report/sarifReport.js'
+import type { AuditResult, Severity } from './types.js'
 
 const SEVERITY_ORDER: Record<Severity, number> = {
   low: 0,
@@ -22,9 +27,61 @@ const SEVERITY_ORDER: Record<Severity, number> = {
   high: 2,
 }
 
-function shouldFail(result: { issues: Array<{ severity: Severity }> }, failOn: Severity): boolean {
+// Issues already recorded in a baseline never fail the run on their own.
+function shouldFail(result: AuditResult, failOn: Severity): boolean {
   const threshold = SEVERITY_ORDER[failOn]
-  return result.issues.some((i) => SEVERITY_ORDER[i.severity] >= threshold)
+  return result.issues.some((i) => !i.inBaseline && SEVERITY_ORDER[i.severity] >= threshold)
+}
+
+function resolveFormat(
+  opts: { json?: boolean; format?: string },
+  auditConfig: { json?: boolean; format?: OutputFormat } | undefined,
+): OutputFormat {
+  const requested =
+    opts.format ??
+    (opts.json ? 'json' : undefined) ??
+    auditConfig?.format ??
+    (auditConfig?.json ? 'json' : 'terminal')
+  if (!(OUTPUT_FORMATS as readonly string[]).includes(requested)) {
+    fail(`Invalid format: "${requested}". Use ${OUTPUT_FORMATS.join(', ')}.`)
+  }
+  return requested as OutputFormat
+}
+
+function parseFailOn(value: string | undefined): Severity | undefined {
+  if (value === undefined) return undefined
+  if (!['low', 'medium', 'high'].includes(value)) {
+    fail(`Invalid fail-on value: "${value}". Use low, medium, or high.`)
+  }
+  return value as Severity
+}
+
+function parseMinScore(value: string | number | undefined): number | undefined {
+  if (value === undefined) return undefined
+  const score = Number(value)
+  if (!Number.isInteger(score) || score < 0 || score > 100) {
+    fail(`Invalid min-score value: "${value}". Use an integer from 0 to 100.`)
+  }
+  return score
+}
+
+function printResult(result: AuditResult, format: OutputFormat): void {
+  switch (format) {
+    case 'json':
+      process.stdout.write(toJsonReport(result) + '\n')
+      return
+    case 'markdown':
+      process.stdout.write(toMarkdownReport(result) + '\n')
+      return
+    case 'sarif':
+      process.stdout.write(toSarifReport(result) + '\n')
+      return
+    case 'github':
+      process.stdout.write(toGithubAnnotations(result) + '\n')
+      return
+    case 'terminal':
+      printTerminalReport(result)
+  }
 }
 
 function fail(message: string): never {
@@ -55,13 +112,30 @@ program
   .option('--output <path>', 'Write Markdown report to a file inside the audited repo')
   .option('--allow-outside', 'Allow --output to write outside the audited repository')
   .option(
+    '--format <format>',
+    `Output format for stdout (${OUTPUT_FORMATS.join('|')}). --json is shorthand for --format json`,
+  )
+  .option(
     '--fail-on <severity>',
     'Exit non-zero if any issue at or above this severity is found (low|medium|high)',
+  )
+  .option('--min-score <score>', 'Exit non-zero if the score is below this value (0-100)')
+  .option(
+    '--baseline <file>',
+    'A previous `acd audit --json` report; issues it already lists do not trigger --fail-on',
   )
   .action(
     async (
       cliRepoPath: string | undefined,
-      opts: { json?: boolean; output?: string; allowOutside?: boolean; failOn?: string },
+      opts: {
+        json?: boolean
+        format?: string
+        output?: string
+        allowOutside?: boolean
+        failOn?: string
+        minScore?: string
+        baseline?: string
+      },
     ) => {
       // Determine config search dir: CLI path if given, otherwise cwd
       const configSearchDir = path.resolve(cliRepoPath ?? process.cwd())
@@ -83,8 +157,9 @@ program
       }
 
       // CLI flags override config
-      const useJson = opts.json ?? config?.audit?.json ?? false
-      const failOnRaw = opts.failOn ?? config?.audit?.failOn
+      const format = resolveFormat(opts, config?.audit)
+      const failOn = parseFailOn(opts.failOn ?? config?.audit?.failOn)
+      const minScore = parseMinScore(opts.minScore ?? config?.audit?.minScore)
 
       // --allow-outside only widens a path the user typed; a path from .acdrc
       // comes from the audited repository and is always confined to it.
@@ -101,15 +176,36 @@ program
         }
       }
 
-      if (!useJson) {
+      // A baseline typed on the command line is the user's file; one from
+      // .acdrc must live inside the audited repository.
+      let baselinePath: string | undefined
+      if (opts.baseline) {
+        baselinePath = path.resolve(opts.baseline)
+      } else if (config?.audit?.baseline) {
+        baselinePath = path.resolve(resolvedRepo, config.audit.baseline)
+        if (!isWithin(resolvedRepo, baselinePath)) {
+          fail(`Config error: audit.baseline must stay inside ${resolvedRepo}`)
+        }
+      }
+
+      if (format === 'terminal') {
         process.stderr.write(`Auditing ${toDisplayText(resolvedRepo)}...\n`)
       }
 
-      const result = await auditRepo(resolvedRepo, {
+      let result = await auditRepo(resolvedRepo, {
         ignoreFiles: config?.rules?.ignoreFiles,
         disabledChecks: config?.rules?.disabledChecks,
         allowedMissingScripts: config?.rules?.allowedMissingScripts,
       })
+
+      if (baselinePath) {
+        try {
+          result = applyBaseline(result, await loadBaseline(baselinePath), baselinePath)
+        } catch (err) {
+          if (err instanceof BaselineError) fail(`Baseline error: ${err.message}`)
+          throw err
+        }
+      }
 
       if (outputPath) {
         const mdContent = toMarkdownReport(result)
@@ -124,21 +220,15 @@ program
         }
       }
 
-      if (useJson) {
-        process.stdout.write(toJsonReport(result) + '\n')
-      } else {
-        printTerminalReport(result)
-      }
+      printResult(result, format)
 
-      if (failOnRaw) {
-        const sev = failOnRaw as Severity
-        if (!['low', 'medium', 'high'].includes(sev)) {
-          process.stderr.write(`Invalid fail-on value: "${sev}". Use low, medium, or high.\n`)
-          process.exit(1)
-        }
-        if (shouldFail(result, sev)) {
-          process.exit(1)
-        }
+      const failingIssue = failOn && shouldFail(result, failOn)
+      const belowMinScore = minScore !== undefined && result.score.total < minScore
+      if (belowMinScore) {
+        process.stderr.write(`Score ${result.score.total} is below --min-score ${minScore}.\n`)
+      }
+      if (failingIssue || belowMinScore) {
+        process.exit(1)
       }
     },
   )

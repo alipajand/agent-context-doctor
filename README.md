@@ -93,6 +93,9 @@ acd audit --output docs/report.md          # write a Markdown report (inside the
 acd audit --output /tmp/r.md --allow-outside  # write the report outside the repo
 acd audit --json --output docs/report.md   # both at once
 acd audit --fail-on high                   # exit non-zero on high issues (also: medium, low)
+acd audit --min-score 80                   # exit non-zero when the score is below 80
+acd audit --format github                  # GitHub Actions annotations (also: json, markdown, sarif)
+acd audit --baseline .acd-baseline.json    # only issues missing from the baseline trigger --fail-on
 acd list                                   # list detected context files only
 ```
 
@@ -215,6 +218,9 @@ Add an optional `.acdrc` file at the repo root to set defaults without changing 
 | `output` | `string` | Default Markdown output path. Overridden by `--output`. Must resolve inside the audited repository. |
 | `json` | `boolean` | Default JSON mode. Overridden by `--json`. |
 | `failOn` | `"low" \| "medium" \| "high"` | Default fail threshold. Overridden by `--fail-on`. |
+| `format` | `"terminal" \| "json" \| "markdown" \| "sarif" \| "github"` | Default output format. Overridden by `--format` or `--json`. |
+| `minScore` | `number` (0–100) | Fail when the score is below this value. Overridden by `--min-score`. |
+| `baseline` | `string` | Baseline report (from `acd audit --json`), relative to the audited repo and inside it. Overridden by `--baseline`. |
 
 ### `rules` options
 
@@ -265,7 +271,7 @@ If you typo a category name, `acd` emits a low-severity `suppressions` issue so 
 
 ## CI usage
 
-Use `--fail-on` to gate a pipeline. Exit codes: `0` = clean (or issues below threshold), `1` = issues at or above the `--fail-on` threshold.
+Gate a pipeline with `--fail-on <severity>` and/or `--min-score <n>`. Exit codes: `0` = passed, `1` = an issue at or above `--fail-on`, a score below `--min-score`, or a usage/config error.
 
 ```yaml
 # .github/workflows/agent-context.yml
@@ -286,6 +292,40 @@ jobs:
 ```
 
 To produce a report artifact, add `--output docs/agent-context-report.md` (and `--json` if you also want machine-readable output).
+
+### Inline annotations and code scanning
+
+`--format github` prints workflow annotations, so findings show up on the pull request diff:
+
+```yaml
+      - run: npx --yes --package=github:alipajand/agent-context-doctor#<commit-sha> acd audit --format github --fail-on high
+```
+
+`--format sarif` prints SARIF 2.1.0 for GitHub code scanning:
+
+```yaml
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      # ... checkout and setup-node as above ...
+      - run: npx --yes --package=github:alipajand/agent-context-doctor#<commit-sha> acd audit --format sarif > acd.sarif
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: acd.sarif
+          category: agent-context-doctor
+```
+
+### Adopting in an existing repository
+
+Record today's findings once and fail only on new ones:
+
+```bash
+acd audit --json > .acd-baseline.json   # commit this file
+acd audit --baseline .acd-baseline.json --fail-on high
+```
+
+Issues are matched by category, file, message, and evidence rather than line number, so editing other parts of a file does not make old findings look new. Known issues are still reported (marked `(known)`) and still count toward the score; they just don't trigger `--fail-on`.
 
 ## Limitations
 
