@@ -1,5 +1,6 @@
 import type { ContextIssue } from '../../types.js'
 import { getLineEvidence } from '../evidence.js'
+import { toDisplayText } from '../../text/displayText.js'
 
 const TEMPLATE_MARKERS = [
   /\bTODO\b/i,
@@ -35,7 +36,7 @@ export function checkPlaceholderContent(filePath: string, content: string): Cont
           file: filePath,
           line: idx + 1,
           evidence: getLineEvidence(content, idx + 1),
-          message: `Placeholder content detected: "${line.trim().slice(0, 80)}"`,
+          message: `Placeholder content detected: "${toDisplayText(line.trim()).slice(0, 80)}"`,
           recommendation: 'Replace placeholder content with real, project-specific instructions.',
         })
       }

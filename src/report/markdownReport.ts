@@ -1,13 +1,35 @@
+import { toDisplayText } from '../text/displayText.js'
 import type { AuditResult, ContextIssue, Severity } from '../types.js'
 
+// Escapes text for Markdown prose and table cells. Raw `<` would let excerpts
+// such as `<!-- describe -->` open an HTML comment that hides the rest of the report.
 function escapeMarkdown(str: string): string {
-  return str.replace(/\|/g, '\\|')
+  return toDisplayText(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\|/g, '\\|')
+    .replace(/([`*_[\]])/g, '\\$1')
+}
+
+function codeSpan(str: string): string {
+  const text = toDisplayText(str)
+  const longestRun = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length))
+  const fence = '`'.repeat(longestRun + 1)
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
+  return `${fence}${pad}${text}${pad}${fence}`
+}
+
+// GFM splits table rows on `|` even inside code spans unless it is escaped.
+function tableCodeSpan(str: string): string {
+  return codeSpan(str).replace(/\|/g, '\\|')
 }
 
 function issueRow(issue: ContextIssue): string {
   const loc = issue.line ? `:${issue.line}` : ''
   const file = `${issue.file}${loc}`
-  return `| ${issue.severity} | ${issue.category} | ${escapeMarkdown(file)} | ${escapeMarkdown(issue.message)} | ${escapeMarkdown(issue.recommendation)} |`
+  return `| ${issue.severity} | ${escapeMarkdown(issue.category)} | ${escapeMarkdown(file)} | ${escapeMarkdown(issue.message)} | ${escapeMarkdown(issue.recommendation)} |`
 }
 
 export function toMarkdownReport(result: AuditResult): string {
@@ -21,7 +43,7 @@ export function toMarkdownReport(result: AuditResult): string {
   lines.push('# Agent Context Doctor Report')
   lines.push('')
   lines.push(`**Generated:** ${timestamp}`)
-  lines.push(`**Repo:** \`${repoPath}\``)
+  lines.push(`**Repo:** ${codeSpan(repoPath)}`)
   lines.push(`**Score:** ${score.total} / ${score.max} — ${score.grade}`)
   lines.push('')
 
@@ -45,7 +67,7 @@ export function toMarkdownReport(result: AuditResult): string {
     lines.push('| File | Kind | Size (bytes) |')
     lines.push('|------|------|-------------|')
     for (const f of files) {
-      lines.push(`| \`${f.path}\` | ${f.kind} | ${f.bytes} |`)
+      lines.push(`| ${tableCodeSpan(f.path)} | ${f.kind} | ${f.bytes} |`)
     }
   }
   lines.push('')
@@ -74,10 +96,10 @@ export function toMarkdownReport(result: AuditResult): string {
     lines.push('')
     for (const issue of sevIssues) {
       const loc = issue.line ? `:${issue.line}` : ''
-      lines.push(`- **\`${issue.file}${loc}\`** — ${issue.message}`)
-      lines.push(`  - ${issue.recommendation}`)
+      lines.push(`- **${codeSpan(`${issue.file}${loc}`)}** — ${escapeMarkdown(issue.message)}`)
+      lines.push(`  - ${escapeMarkdown(issue.recommendation)}`)
       if (issue.evidence) {
-        lines.push(`  - Evidence: \`${escapeMarkdown(issue.evidence)}\``)
+        lines.push(`  - Evidence: ${codeSpan(issue.evidence)}`)
       }
     }
     lines.push('')

@@ -150,4 +150,24 @@ Include: files changed, commands run, tests passed, known limitations.
     expect(result.score.total).toBeGreaterThanOrEqual(0)
     expect(result.score.grade).toBeDefined()
   })
+
+  it('reports but never reads a context file that links outside the repo', async () => {
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(path.join(outsideDir, 'env.md'), 'TODO: skip tests SECRET_TOKEN=abc')
+      await fs.symlink(path.join(outsideDir, 'env.md'), path.join(tmpDir, 'AGENTS.md'))
+      const result = await auditRepo(tmpDir)
+      expect(result.issues.map((i) => i.category)).toEqual(['file-access'])
+      expect(JSON.stringify(result)).not.toContain('SECRET_TOKEN')
+    } finally {
+      await fs.rm(outsideDir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports an oversized context file without auditing its contents', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), 'skip tests\n'.repeat(120_000))
+    const result = await auditRepo(tmpDir)
+    expect(result.issues.map((i) => i.category)).toEqual(['file-size'])
+    expect(result.issues[0].severity).toBe('medium')
+  })
 })

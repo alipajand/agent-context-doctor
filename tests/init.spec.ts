@@ -66,6 +66,23 @@ describe('initRepo', () => {
       .catch(() => false)
     expect(exists).toBe(true)
   })
+
+  it('refuses to write through an AGENTS.md symlink, even with force', async () => {
+    const target = path.join(tmpDir, 'elsewhere.md')
+    await fs.writeFile(target, 'keep me', 'utf-8')
+    await fs.symlink(target, path.join(tmpDir, 'AGENTS.md'))
+    const result = await initRepo(tmpDir, { force: true })
+    expect(result.status).toBe('symlink')
+    expect(await fs.readFile(target, 'utf-8')).toBe('keep me')
+  })
+
+  it('does not create the target of a dangling AGENTS.md symlink', async () => {
+    const target = path.join(tmpDir, 'created-by-link.md')
+    await fs.symlink(target, path.join(tmpDir, 'AGENTS.md'))
+    const result = await initRepo(tmpDir)
+    expect(result.status).toBe('symlink')
+    await expect(fs.access(target)).rejects.toThrow()
+  })
 })
 
 // ── AGENTS_TEMPLATE ───────────────────────────────────────────────────────────

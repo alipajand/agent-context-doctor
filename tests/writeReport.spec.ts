@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { writeReport } from '../src/fs/writeReport.js'
+import { OutputPathError } from '../src/fs/resolveOutputPath.js'
 
 let tmpDir: string
 
@@ -44,5 +45,34 @@ describe('writeReport', () => {
   it('returns an absolute path', async () => {
     const resolved = await writeReport('r.md', 'x', tmpDir)
     expect(path.isAbsolute(resolved)).toBe(true)
+  })
+
+  it('rejects a path outside the repo', async () => {
+    await expect(writeReport('../escape.md', 'x', tmpDir)).rejects.toThrow(OutputPathError)
+  })
+
+  it('writes outside the repo when allowOutside is set', async () => {
+    const outside = `${tmpDir}-outside.md`
+    try {
+      await writeReport(outside, 'x', tmpDir, { allowOutside: true })
+      expect(await fs.readFile(outside, 'utf-8')).toBe('x')
+    } finally {
+      await fs.rm(outside, { force: true })
+    }
+  })
+
+  it('refuses to write through an existing symlink', async () => {
+    const target = path.join(tmpDir, 'target.md')
+    await fs.writeFile(target, 'original', 'utf-8')
+    await fs.symlink(target, path.join(tmpDir, 'report.md'))
+    await expect(writeReport('report.md', 'new', tmpDir)).rejects.toThrow(/symbolic link/)
+    expect(await fs.readFile(target, 'utf-8')).toBe('original')
+  })
+
+  it('refuses to create the target of a dangling symlink', async () => {
+    const target = path.join(tmpDir, 'created-by-link.md')
+    await fs.symlink(target, path.join(tmpDir, 'report.md'))
+    await expect(writeReport('report.md', 'new', tmpDir)).rejects.toThrow(/symbolic link/)
+    await expect(fs.access(target)).rejects.toThrow()
   })
 })

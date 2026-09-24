@@ -173,6 +173,12 @@ describe('checkCommandAlignment', () => {
     )
     expect(issues).toHaveLength(0)
   })
+
+  it('does not treat Object.prototype members as existing scripts', () => {
+    const issues = checkCommandAlignment('AGENTS.md', 'Run `pnpm constructor`.', {})
+    expect(issues).toHaveLength(1)
+    expect(issues[0].message).toContain('"constructor"')
+  })
 })
 
 // ── checkCommandsWithoutPackageJson ─────────────────────────────────────────

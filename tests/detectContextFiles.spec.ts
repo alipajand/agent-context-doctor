@@ -142,6 +142,56 @@ describe('detectContextFiles', () => {
     const files = await detectContextFiles(tmpDir, ['**/AGENTS.md'])
     expect(files.find((f) => f.path === 'AGENTS.md')).toBeUndefined()
   })
+
+  it('reads a symlink whose target stays inside the repo', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), '# Agents')
+    await fs.mkdir(path.join(tmpDir, '.claude'))
+    await fs.symlink('../AGENTS.md', path.join(tmpDir, '.claude', 'CLAUDE.md'))
+    const files = await detectContextFiles(tmpDir)
+    const link = files.find((f) => f.path === path.join('.claude', 'CLAUDE.md'))
+    expect(link).toBeDefined()
+    expect(link?.skipped).toBeUndefined()
+    expect(link?.bytes).toBe(8)
+  })
+
+  it('marks a symlink that points outside the repo as skipped without stating it', async () => {
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(path.join(outsideDir, 'secret.md'), 'TOP SECRET')
+      await fs.symlink(path.join(outsideDir, 'secret.md'), path.join(tmpDir, 'AGENTS.md'))
+      const files = await detectContextFiles(tmpDir)
+      expect(files).toEqual([
+        { path: 'AGENTS.md', kind: 'agents', bytes: 0, skipped: 'outside-repo' },
+      ])
+    } finally {
+      await fs.rm(outsideDir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not traverse a symlinked directory', async () => {
+    const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(path.join(outsideDir, 'notes.md'), '# Notes')
+      await fs.symlink(outsideDir, path.join(tmpDir, '.codex'))
+      const files = await detectContextFiles(tmpDir)
+      expect(files).toHaveLength(0)
+    } finally {
+      await fs.rm(outsideDir, { recursive: true, force: true })
+    }
+  })
+
+  it('marks a dangling symlink as not-a-file', async () => {
+    await fs.symlink(path.join(tmpDir, 'missing.md'), path.join(tmpDir, 'AGENTS.md'))
+    const files = await detectContextFiles(tmpDir)
+    expect(files[0]?.skipped).toBe('not-a-file')
+  })
+
+  it('marks files above the size limit as too-large', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), 'x'.repeat(1024 * 1024 + 1))
+    const files = await detectContextFiles(tmpDir)
+    expect(files[0]?.skipped).toBe('too-large')
+    expect(files[0]?.bytes).toBe(1024 * 1024 + 1)
+  })
 })
 
 describe('isPrimaryInstructionFile', () => {

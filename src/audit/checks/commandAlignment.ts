@@ -85,7 +85,7 @@ export function checkCommandAlignment(
   const issues: ContextIssue[] = []
 
   for (const cmd of commands) {
-    if (!(cmd.script in scripts)) {
+    if (!Object.hasOwn(scripts, cmd.script)) {
       issues.push({
         id: `command-alignment-${filePath}-${cmd.line}-${cmd.script}`,
         severity: 'medium',

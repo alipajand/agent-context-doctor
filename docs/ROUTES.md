@@ -19,7 +19,8 @@ Audit agent context files in a repository for quality, safety, contradictions, p
 | Flag | Type | Description |
 | --- | --- | --- |
 | `--json` | boolean | Output the full `AuditResult` as JSON to stdout instead of terminal output |
-| `--output <path>` | string | Write a Markdown report to this path (relative to `repoPath`) |
+| `--output <path>` | string | Write a Markdown report to this path. Relative paths resolve under `repoPath`; the result must stay inside the audited repository |
+| `--allow-outside` | boolean | Allow `--output` to write outside the audited repository. Applies only to a path passed on the command line, never to `audit.output` from `.acdrc` |
 | `--fail-on <severity>` | `low\|medium\|high` | Exit non-zero if any issue at or above this severity is found |
 
 **Config precedence** (highest to lowest): CLI flag → `.acdrc` field → default.
@@ -29,7 +30,7 @@ Audit agent context files in a repository for quality, safety, contradictions, p
 | Code | Meaning |
 | --- | --- |
 | `0` | Audit completed (no issues above `--fail-on` threshold, or `--fail-on` not set) |
-| `1` | Config error, invalid `--fail-on` value, or threshold exceeded |
+| `1` | Config error, invalid `--fail-on` value, report path outside the repository, or threshold exceeded |
 
 **Examples**
 
@@ -120,9 +121,9 @@ A JSON file at the root of the audited repository. All fields are optional.
 ```jsonc
 {
   "audit": {
-    "repoPath": ".",          // Override the repo path (relative to .acdrc location)
+    "repoPath": ".",          // Override the repo path (relative to .acdrc; must stay inside that directory)
     "json": true,             // Equivalent to --json
-    "output": "report.md",    // Equivalent to --output
+    "output": "report.md",    // Equivalent to --output; always confined to the audited repo
     "failOn": "high"          // Equivalent to --fail-on
   },
   "rules": {

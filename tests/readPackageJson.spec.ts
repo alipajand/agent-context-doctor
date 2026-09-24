@@ -38,4 +38,22 @@ describe('readPackageScripts', () => {
     const scripts = await readPackageScripts(tmpDir)
     expect(scripts).toBeNull()
   })
+
+  it('returns an empty object when scripts is not an object', async () => {
+    await fs.writeFile(path.join(tmpDir, 'package.json'), JSON.stringify({ scripts: 'build' }))
+    expect(await readPackageScripts(tmpDir)).toEqual({})
+  })
+
+  it('drops scripts whose command is not a string', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'package.json'),
+      JSON.stringify({ scripts: { test: 'vitest', bad: 42 } }),
+    )
+    expect(await readPackageScripts(tmpDir)).toEqual({ test: 'vitest' })
+  })
+
+  it('returns null when package.json is a directory', async () => {
+    await fs.mkdir(path.join(tmpDir, 'package.json'))
+    expect(await readPackageScripts(tmpDir)).toBeNull()
+  })
 })

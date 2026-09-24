@@ -23,9 +23,12 @@ The tool has no runtime server, no database, no network dependencies, and no LLM
 | `src/report/jsonReport.ts` | JSON serialization of `AuditResult` |
 | `src/report/markdownReport.ts` | Markdown report writer |
 | `src/fs/findFiles.ts` | `fast-glob`-backed file discovery for context files |
-| `src/fs/readTextFile.ts` | UTF-8 text reader with byte counting |
+| `src/fs/readTextFile.ts` | Size- and type-guarded UTF-8 reader with byte counting |
 | `src/fs/readPackageJson.ts` | Reads `package.json` scripts for command-alignment checks |
-| `src/fs/writeReport.ts` | Writes Markdown report to disk (relative to audited repo root) |
+| `src/fs/writeReport.ts` | Writes Markdown report to disk; refuses to follow a symlink at the target |
+| `src/fs/resolveOutputPath.ts` | Confines report paths to the audited repo unless `--allow-outside` is passed |
+| `src/fs/safePath.ts` | Lexical and symlink-aware path containment helpers |
+| `src/text/displayText.ts` | Neutralizes control and invisible characters before text is printed or written |
 | `src/init/initRepo.ts` | Safe-write scaffolder for `AGENTS.md` |
 | `src/init/template.ts` | Starter `AGENTS.md` template string |
 | `tests/*` | Vitest specs — one spec file per check plus CLI integration tests |
@@ -43,6 +46,7 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkValidationCommands` | `validationCommands.ts` | Primary files that don't mention test/lint/typecheck/build |
 | `checkFinalReporting` | `finalReporting.ts` | Primary files without final-report guidance (files changed, commands run, etc.) |
 | `checkContradictions` | `contradictions.ts` | Cross-file directives that contradict each other (always run tests vs. skip tests) |
+| `checkSkippedFile` | `skippedFiles.ts` | Context files that were detected but not read: links outside the repo, broken links, or files over 1 MiB |
 
 ## Scoring model
 

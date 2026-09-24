@@ -10,6 +10,7 @@ import {
   checkCommandsWithoutPackageJson,
 } from './checks/commandAlignment.js'
 import { checkContradictions } from './checks/contradictions.js'
+import { checkSkippedFile } from './checks/skippedFiles.js'
 import { computeScore } from './score.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
@@ -51,6 +52,11 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
   const fileContents: Array<{ path: string; content: string }> = []
 
   for (const ctxFile of contextFiles) {
+    if (ctxFile.skipped) {
+      issues.push(...checkSkippedFile(ctxFile))
+      continue
+    }
+
     const absolutePath = path.resolve(absoluteRepo, ctxFile.path)
     const content = await readTextFile(absolutePath)
 

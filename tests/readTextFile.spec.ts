@@ -25,6 +25,17 @@ describe('readTextFile', () => {
     expect(await readTextFile(path.join(tmpDir, 'nope.txt'))).toBe('')
   })
 
+  it('returns an empty string for a directory', async () => {
+    expect(await readTextFile(tmpDir)).toBe('')
+  })
+
+  it('returns an empty string for a file above the size limit', async () => {
+    const file = path.join(tmpDir, 'big.md')
+    await fs.writeFile(file, 'x'.repeat(64), 'utf-8')
+    expect(await readTextFile(file, 32)).toBe('')
+    expect(await readTextFile(file, 64)).toBe('x'.repeat(64))
+  })
+
   it('preserves multi-line content', async () => {
     const file = path.join(tmpDir, 'multi.txt')
     await fs.writeFile(file, 'line1\nline2\n', 'utf-8')
