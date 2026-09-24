@@ -23,6 +23,7 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Changed
 
+- Install docs point to GitHub (`npm install -g github:alipajand/agent-context-doctor`). The npm package named `agent-context-doctor` belongs to an unrelated project, and the previous instructions would have installed it. A `prepare` script now builds `dist/` for git installs.
 - Node.js 22.12 or later is now required. `commander` 15 already required it, so the old `>=18` range was inaccurate.
 - CI runs on Node 22 and 24 with SHA-pinned actions and a read-only token; Dependabot now groups updates and also covers GitHub Actions.
 

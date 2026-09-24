@@ -2,11 +2,13 @@
 
 Use this document every time you publish a new version of `agent-context-doctor` to npm.
 
+> **Package name.** The unscoped npm name `agent-context-doctor` is owned by an unrelated publisher, so it cannot be used for this project. Before the first publish, set `name` in `package.json` to a scope you control (for example `@alipajand/agent-context-doctor`) and update the install instructions in `README.md`. The commands below use `<package>` for that name.
+
 ---
 
 ## Prerequisites
 
-- npm account with 2FA enabled and publish rights to the `agent-context-doctor` package
+- npm account with 2FA enabled and publish rights to `<package>`
 - `pnpm` installed globally
 - Clean `main` branch with all CI checks green
 - No uncommitted local changes
@@ -105,8 +107,8 @@ npm will prompt for your 2FA code. Enter it to complete the publish.
 ### 9. Confirm the release
 
 ```bash
-npm view agent-context-doctor version
-npx agent-context-doctor --version
+npm view <package> version
+npx --package=<package> acd --version
 ```
 
 Both should show the version you just published.
@@ -125,7 +127,7 @@ Both should show the version you just published.
 If the published version is broken:
 
 ```bash
-npm deprecate agent-context-doctor@<bad-version> "Broken release, use <previous-version> instead"
+npm deprecate <package>@<bad-version> "Broken release, use <previous-version> instead"
 ```
 
 Do **not** unpublish unless the release contains secrets or malware. Use deprecation instead.

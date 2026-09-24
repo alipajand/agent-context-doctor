@@ -48,10 +48,10 @@ Every run produces a 0–100 score: start at 100, subtract **20** per high issue
 
 ## Quick start
 
-Install from npm (after release):
+`acd` is not published to npm yet. **The npm package named `agent-context-doctor` is an unrelated project.** Installing it does not give you this tool, and it runs someone else's code. Install from GitHub instead; npm builds the CLI during install:
 
 ```bash
-npm install -g agent-context-doctor
+npm install -g github:alipajand/agent-context-doctor
 ```
 
 Or run from source:
@@ -284,7 +284,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: npx agent-context-doctor audit --fail-on high
+      # Pin a commit SHA you have reviewed.
+      - run: npx --yes --package=github:alipajand/agent-context-doctor#<commit-sha> acd audit --fail-on high
 ```
 
 To produce a report artifact, add `--output docs/agent-context-report.md` (and `--json` if you also want machine-readable output).
