@@ -15,6 +15,7 @@ import { initRepo } from './init/initRepo.js'
 import { AGENTS_TEMPLATE } from './init/template.js'
 import { VERSION } from './version.js'
 import { applyBaseline, BaselineError, loadBaseline } from './audit/baseline.js'
+import { CHECKS } from './audit/checkCatalog.js'
 import { OUTPUT_FORMATS } from './config/schema.js'
 import type { OutputFormat } from './config/schema.js'
 import { toGithubAnnotations } from './report/githubReport.js'
@@ -285,6 +286,22 @@ program
 
     const verb = result.status === 'created' ? 'Created' : 'Overwrote'
     process.stderr.write(`${verb} ${result.path}\n`)
+  })
+
+program
+  .command('checks')
+  .description('List the checks acd runs and the IDs accepted by rules.disabledChecks')
+  .option('--json', 'Output the check catalog as JSON')
+  .action((opts: { json?: boolean }) => {
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(CHECKS, null, 2) + '\n')
+      return
+    }
+    const width = Math.max(...CHECKS.map((c) => c.id.length))
+    for (const check of CHECKS) {
+      console.log(`${check.id.padEnd(width)}  ${check.severity.padEnd(15)} ${check.appliesTo}`)
+      console.log(`${' '.repeat(width)}  ${check.description}`)
+    }
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {
