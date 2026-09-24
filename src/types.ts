@@ -14,7 +14,22 @@ export type ContextIssue = {
 }
 
 export type ContextFileKind =
-  'agents' | 'claude' | 'cursor' | 'copilot' | 'codex' | 'prompt' | 'unknown'
+  | 'agents'
+  | 'claude'
+  | 'cursor'
+  | 'copilot'
+  | 'codex'
+  | 'gemini'
+  | 'windsurf'
+  | 'cline'
+  | 'roo'
+  | 'kiro'
+  | 'junie'
+  | 'augment'
+  | 'continue'
+  | 'goose'
+  | 'prompt'
+  | 'unknown'
 
 /**
  * Why a detected file was not read:

@@ -160,37 +160,32 @@ Issues:
 
 ## Audited file types
 
-```text
-AGENTS.md
-CLAUDE.md
-claude.md
-.claude/CLAUDE.md
-.claude/claude.md
-.claude/commands/*.md
-.cursorrules
-.cursor/rules/*.mdc
-.github/copilot-instructions.md
-docs/prompts/**/*.md
-prompts/**/*.md
-.codex/**/*.md
-.github/instructions/**/*.md
-```
+| Tool | Files | Kind |
+|------|-------|------|
+| Cross-tool | `AGENTS.md`, `AGENT.md`, and nested `**/AGENTS.md` | `agents` |
+| Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, nested `**/CLAUDE.md`, `.claude/commands/**/*.md`, `.claude/agents/**/*.md`, `.claude/skills/**/SKILL.md` | `claude` |
+| Gemini | `GEMINI.md`, nested `**/GEMINI.md`, `.gemini/styleguide.md` | `gemini` |
+| Cursor | `.cursorrules`, `.cursor/rules/**/*.mdc`, `.cursor/rules/**/*.md` | `cursor` |
+| GitHub Copilot | `.github/copilot-instructions.md`, `.github/prompts/**/*.prompt.md`, `.github/chatmodes/**/*.chatmode.md`, `.github/agents/**/*.md` | `copilot` |
+| Copilot path instructions | `.github/instructions/**/*.md` | `prompt` |
+| Codex | `.codex/**/*.md` | `codex` |
+| Windsurf | `.windsurfrules`, `.windsurf/rules/**/*.md` | `windsurf` |
+| Cline | `.clinerules` (file or directory of `*.md`) | `cline` |
+| Roo Code | `.roorules`, `.roo/rules*/**/*.md` | `roo` |
+| Kiro | `.kiro/steering/**/*.md` | `kiro` |
+| Junie | `.junie/guidelines.md` | `junie` |
+| Augment | `.augment-guidelines`, `.augment/rules/**/*.md` | `augment` |
+| Continue | `.continue/rules/**/*.md` | `continue` |
+| Goose | `.goosehints` | `goose` |
+| Prompt libraries | `docs/prompts/**/*.md`, `prompts/**/*.md` | `prompt` |
 
-| Pattern | Kind |
-|---------|------|
-| `AGENTS.md` | agents |
-| `CLAUDE.md`, `claude.md` | claude |
-| `.claude/CLAUDE.md`, `.claude/claude.md` | claude |
-| `.claude/commands/*.md` | claude |
-| `.cursorrules` | cursor |
-| `.cursor/rules/*.mdc` | cursor |
-| `.github/copilot-instructions.md` | copilot |
-| `docs/prompts/**/*.md` | prompt |
-| `prompts/**/*.md` | prompt |
-| `.codex/**/*.md` | codex |
-| `.github/instructions/**/*.md` | prompt |
+Root files match case-insensitively (`claude.md` and `CLAUDE.md` are both detected). Nested copies must use the exact names tools load (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`), so a file like `docs/agents.md` is not mistaken for agent instructions. `node_modules`, `dist`, `build`, `coverage`, `.git`, `vendor`, test fixture directories (`fixtures`, `__fixtures__`, `testdata`), virtualenvs, `target`, `.next`, and `.turbo` are skipped.
 
-Matching is case-insensitive, so `claude.md` and `CLAUDE.md` are both detected. `node_modules`, `dist`, `build`, `coverage`, and `.git` are skipped.
+### Primary and supplementary files
+
+The structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`) apply to the files a tool loads as its standing instructions: root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, `.claude/CLAUDE.md`, Copilot's main instructions, and rule directories such as `.cursor/rules/`. Nested `AGENTS.md` files, commands, subagents, skills, and prompt libraries are supplementary: they get the content checks (risky language, secrets, hidden characters, placeholders, commands) but not the structural ones.
+
+A primary file counts as covered when the guidance appears in the file itself, in a context file it references (for example a `CLAUDE.md` that says "Follow AGENTS.md" or imports `@AGENTS.md`), or in another primary file for the same tool (a `.cursor/rules/` set is evaluated as a whole).
 
 ## Configuration
 

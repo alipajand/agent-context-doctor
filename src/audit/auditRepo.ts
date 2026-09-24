@@ -21,12 +21,51 @@ import {
   parseSuppressions,
   KNOWN_SUPPRESSION_CATEGORIES,
 } from './suppressions.js'
-import type { AuditResult, ContextIssue } from '../types.js'
+import type { AuditResult, ContextFileKind, ContextIssue } from '../types.js'
 
 export type AuditOptions = {
   ignoreFiles?: string[]
   disabledChecks?: string[]
   allowedMissingScripts?: string[]
+}
+
+type LoadedFile = { path: string; kind: ContextFileKind; content: string }
+
+function toPosix(p: string): string {
+  return p.replace(/\\/g, '/')
+}
+
+/** True when `content` points at `target`, by repo path, `@path` import, or root file name. */
+function references(content: string, target: string): boolean {
+  const posix = toPosix(target)
+  if (content.includes(posix)) return true
+  return (
+    !posix.includes('/') &&
+    new RegExp(`(^|[\\s@(\\[\`'"/])${escapeRegExp(posix)}\\b`, 'i').test(content)
+  )
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Text the structural checks (safety, validation, final report) evaluate for a
+ * primary file. Guidance often lives in one shared place: CLAUDE.md says
+ * "Follow AGENTS.md", and a .cursor/rules set spreads it over several files.
+ * A file therefore counts as covered by its own content, by context files it
+ * references, and by other primary files for the same tool.
+ */
+function structuralContext(filePath: string, files: LoadedFile[]): string {
+  const self = files.find((f) => f.path === filePath)
+  if (!self) return ''
+  const related = files.filter(
+    (f) =>
+      f.path !== filePath &&
+      (references(self.content, f.path) ||
+        (f.kind === self.kind && isPrimaryInstructionFile(f.path))),
+  )
+  return [self.content, ...related.map((f) => f.content)].join('\n')
 }
 
 export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Promise<AuditResult> {
@@ -51,64 +90,62 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
     })
   }
 
-  const fileContents: Array<{ path: string; content: string }> = []
+  const fileContents: LoadedFile[] = []
 
   for (const ctxFile of contextFiles) {
     if (ctxFile.skipped) {
       issues.push(...checkSkippedFile(ctxFile))
       continue
     }
+    const content = await readTextFile(path.resolve(absoluteRepo, ctxFile.path))
+    fileContents.push({ path: ctxFile.path, kind: ctxFile.kind, content })
+  }
 
-    const absolutePath = path.resolve(absoluteRepo, ctxFile.path)
-    const content = await readTextFile(absolutePath)
-
-    fileContents.push({ path: ctxFile.path, content })
-
+  for (const { path: filePath, content } of fileContents) {
     const fileIssues: ContextIssue[] = []
 
     if (!disabled.has('hidden-characters')) {
-      fileIssues.push(...checkHiddenCharacters(ctxFile.path, content))
+      fileIssues.push(...checkHiddenCharacters(filePath, content))
     }
 
     if (!disabled.has('secrets')) {
-      fileIssues.push(...checkSecrets(ctxFile.path, content))
+      fileIssues.push(...checkSecrets(filePath, content))
     }
 
     if (!disabled.has('placeholder-content')) {
-      fileIssues.push(...checkPlaceholderContent(ctxFile.path, content))
+      fileIssues.push(...checkPlaceholderContent(filePath, content))
     }
 
     if (!disabled.has('risky-language')) {
-      fileIssues.push(...checkRiskyLanguage(ctxFile.path, content))
+      fileIssues.push(...checkRiskyLanguage(filePath, content))
     }
 
     if (!disabled.has('command-alignment')) {
       if (packageScripts !== null) {
-        const cmdIssues = checkCommandAlignment(ctxFile.path, content, packageScripts).filter(
-          (i) => {
-            const scriptMatch = i.message.match(/missing package script: "(.+)"/)
-            return !scriptMatch || !allowedScripts.has(scriptMatch[1])
-          },
-        )
+        const cmdIssues = checkCommandAlignment(filePath, content, packageScripts).filter((i) => {
+          const scriptMatch = i.message.match(/missing package script: "(.+)"/)
+          return !scriptMatch || !allowedScripts.has(scriptMatch[1])
+        })
         fileIssues.push(...cmdIssues)
       } else {
-        fileIssues.push(...checkCommandsWithoutPackageJson(ctxFile.path, content))
+        fileIssues.push(...checkCommandsWithoutPackageJson(filePath, content))
       }
     }
 
-    if (isPrimaryInstructionFile(ctxFile.path)) {
+    if (isPrimaryInstructionFile(filePath)) {
+      const structural = structuralContext(filePath, fileContents)
       if (!disabled.has('safety-boundaries')) {
-        fileIssues.push(...checkSafetyBoundaries(ctxFile.path, content))
+        fileIssues.push(...checkSafetyBoundaries(filePath, structural))
       }
       if (!disabled.has('validation-commands')) {
-        fileIssues.push(...checkValidationCommands(ctxFile.path, content))
+        fileIssues.push(...checkValidationCommands(filePath, structural))
       }
       if (!disabled.has('final-reporting')) {
-        fileIssues.push(...checkFinalReporting(ctxFile.path, content))
+        fileIssues.push(...checkFinalReporting(filePath, structural))
       }
     }
 
-    issues.push(...filterSuppressedIssues(ctxFile.path, content, fileIssues))
+    issues.push(...filterSuppressedIssues(filePath, content, fileIssues))
   }
 
   // Cross-file contradiction check runs after all files are collected
