@@ -53,10 +53,10 @@ Every run produces a 0–100 score: start at 100, subtract **20** per high issue
 
 ## Quick start
 
-`acd` is not published to npm yet. **The npm package named `agent-context-doctor` is an unrelated project.** Installing it does not give you this tool, and it runs someone else's code. Install from GitHub instead; npm builds the CLI during install:
+`acd` is not published to npm yet. **The npm package named `agent-context-doctor` is an unrelated project.** Installing it does not give you this tool, and it runs someone else's code. Install a release from GitHub instead; npm builds the CLI during install:
 
 ```bash
-npm install -g github:alipajand/agent-context-doctor
+npm install -g github:alipajand/agent-context-doctor#v1.0.0
 ```
 
 Or run from source:
@@ -305,8 +305,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      # Pin a commit SHA you have reviewed.
-      - run: npx --yes --package=github:alipajand/agent-context-doctor#<commit-sha> acd audit --fail-on high
+      # v1.0.0 is a release tag. Tags can be moved, so pin its commit SHA for an exact version.
+      - run: npx --yes --package=github:alipajand/agent-context-doctor#v1.0.0 acd audit --fail-on high
 ```
 
 To produce a report artifact, add `--output docs/agent-context-report.md` (and `--json` if you also want machine-readable output).
@@ -316,7 +316,7 @@ To produce a report artifact, add `--output docs/agent-context-report.md` (and `
 `--format github` prints workflow annotations, so findings show up on the pull request diff:
 
 ```yaml
-      - run: npx --yes --package=github:alipajand/agent-context-doctor#<commit-sha> acd audit --format github --fail-on high
+      - run: npx --yes --package=github:alipajand/agent-context-doctor#v1.0.0 acd audit --format github --fail-on high
 ```
 
 `--format sarif` prints SARIF 2.1.0 for GitHub code scanning:
@@ -327,7 +327,7 @@ To produce a report artifact, add `--output docs/agent-context-report.md` (and `
       security-events: write
     steps:
       # ... checkout and setup-node as above ...
-      - run: npx --yes --package=github:alipajand/agent-context-doctor#<commit-sha> acd audit --format sarif > acd.sarif
+      - run: npx --yes --package=github:alipajand/agent-context-doctor#v1.0.0 acd audit --format sarif > acd.sarif
       - uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: acd.sarif
