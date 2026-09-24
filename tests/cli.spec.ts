@@ -172,6 +172,47 @@ describe('acd audit', () => {
   })
 })
 
+describe('acd audit output confinement', () => {
+  const goodAgents = 'Run pnpm test. Ask before auth changes. Final report: files changed.'
+
+  it('rejects --output that escapes the repo', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), goodAgents)
+    const result = runCli(['audit', tmpDir, '--output', '../escape.md'])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('--allow-outside')
+    await expect(fs.access(path.join(path.dirname(tmpDir), 'escape.md'))).rejects.toThrow()
+  })
+
+  it('writes outside the repo when --allow-outside is passed', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), goodAgents)
+    const outside = `${tmpDir}-report.md`
+    try {
+      const result = runCli(['audit', tmpDir, '--output', outside, '--allow-outside'])
+      expect(result.status).toBe(0)
+      expect(await fs.readFile(outside, 'utf-8')).toContain('# Agent Context Doctor Report')
+    } finally {
+      await fs.rm(outside, { force: true })
+    }
+  })
+
+  it('never lets .acdrc direct the report outside the repo', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), goodAgents)
+    const outside = `${tmpDir}-from-config.md`
+    await fs.writeFile(path.join(tmpDir, '.acdrc'), JSON.stringify({ audit: { output: outside } }))
+    const result = runCli(['audit', tmpDir, '--allow-outside'])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('audit.output must resolve inside')
+    await expect(fs.access(outside)).rejects.toThrow()
+  })
+
+  it('rejects an .acdrc repoPath outside the config directory', async () => {
+    await fs.writeFile(path.join(tmpDir, '.acdrc'), JSON.stringify({ audit: { repoPath: '..' } }))
+    const result = runCli(['audit'], tmpDir)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('audit.repoPath must stay inside')
+  })
+})
+
 describe('acd list', () => {
   it('lists detected context files', () => {
     const result = runCli(['list', path.resolve('examples/good-context')])
@@ -235,6 +276,16 @@ describe('acd init', () => {
     expect(result.stderr).toContain('Overwrote')
     const content = await fs.readFile(path.join(tmpDir, 'AGENTS.md'), 'utf-8')
     expect(content).not.toBe('old')
+  })
+
+  it('exits 1 instead of writing through an AGENTS.md symlink', async () => {
+    const target = path.join(tmpDir, 'target.md')
+    await fs.writeFile(target, 'keep')
+    await fs.symlink(target, path.join(tmpDir, 'AGENTS.md'))
+    const result = runCli(['init', tmpDir, '--force'])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('symbolic link')
+    expect(await fs.readFile(target, 'utf-8')).toBe('keep')
   })
 
   it('prints the template without writing files with --print', async () => {

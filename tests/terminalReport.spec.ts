@@ -175,3 +175,29 @@ describe('printTerminalReport', () => {
     expect(captured()).toContain('Repo-level finding')
   })
 })
+
+describe('printTerminalReport sanitization', () => {
+  it('does not pass escape sequences from audited files to the terminal', () => {
+    printTerminalReport({
+      ...baseResult,
+      files: [{ path: 'AGENTS\u001b[2J.md', kind: 'agents', bytes: 1 }],
+      issues: [
+        {
+          ...baseResult.issues[0],
+          file: 'AGENTS\u001b[2J.md',
+          evidence: 'skip tests \u001b]52;c;ZXZpbA==\u0007',
+        },
+      ],
+    })
+    expect(captured()).not.toContain('\u001b[2J')
+    expect(captured()).not.toContain('\u001b]52')
+  })
+
+  it('marks skipped files', () => {
+    printTerminalReport({
+      ...baseResult,
+      files: [{ path: 'AGENTS.md', kind: 'agents', bytes: 0, skipped: 'outside-repo' }],
+    })
+    expect(captured()).toContain('not read: outside-repo')
+  })
+})

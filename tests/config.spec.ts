@@ -99,6 +99,11 @@ describe('loadConfig', () => {
     const config = await loadConfig(tmpDir)
     expect(config?.rules?.allowedMissingScripts).toEqual(['validate', 'deploy'])
   })
+
+  it('throws when .acdrc is not a regular file', async () => {
+    await fs.mkdir(path.join(tmpDir, '.acdrc'))
+    await expect(loadConfig(tmpDir)).rejects.toThrow('not a regular file')
+  })
 })
 
 // ── ignoreFiles integration ──────────────────────────────────────────────────

@@ -26,6 +26,8 @@ AI coding agents follow whatever their instruction files tell them. A file full 
 | **Final reporting** | Whether instructions describe what to include in a final summary |
 | **Command alignment** | Commands referenced in instructions that don't match `package.json` scripts |
 | **Contradictions** | Conflicting directives across two or more files |
+| **File access** | Context files that are broken symlinks, or symlinks pointing outside the audited directory (never read) |
+| **File size** | Context files over 1 MiB, which are reported instead of read |
 
 ### Severity and score
 
@@ -85,7 +87,8 @@ acd init --print        # print the template without writing
 acd audit                                  # audit the current directory
 acd audit /path/to/repo                    # audit a specific path
 acd audit --json                           # machine-readable output
-acd audit --output docs/report.md          # write a Markdown report
+acd audit --output docs/report.md          # write a Markdown report (inside the repo)
+acd audit --output /tmp/r.md --allow-outside  # write the report outside the repo
 acd audit --json --output docs/report.md   # both at once
 acd audit --fail-on high                   # exit non-zero on high issues (also: medium, low)
 acd list                                   # list detected context files only
@@ -211,8 +214,8 @@ Add an optional `.acdrc` file at the repo root to set defaults without changing 
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `repoPath` | `string` | Default repo to audit (relative to `.acdrc`). Overridden by the CLI `[repoPath]` arg. |
-| `output` | `string` | Default Markdown output path. Overridden by `--output`. |
+| `repoPath` | `string` | Default repo to audit (relative to `.acdrc`, and must stay inside that directory). Overridden by the CLI `[repoPath]` arg. |
+| `output` | `string` | Default Markdown output path. Overridden by `--output`. Must resolve inside the audited repository. |
 | `json` | `boolean` | Default JSON mode. Overridden by `--json`. |
 | `failOn` | `"low" \| "medium" \| "high"` | Default fail threshold. Overridden by `--fail-on`. |
 
@@ -275,10 +278,12 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
         with:
-          node-version: 20
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
       - run: npx agent-context-doctor audit --fail-on high
 ```
 
@@ -291,6 +296,7 @@ To produce a report artifact, add `--output docs/agent-context-report.md` (and `
 - Structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`) match against the whole file, so they report file-level issues with no line number.
 - Files where agents legitimately can't run `pnpm test` locally (e.g. a Copilot file used only in CI) will still be flagged by `validation-commands`. Suppress it with `disabledChecks` or a per-file comment once confirmed.
 - Only text files matching the known patterns above are read. Binary and generated files are skipped.
+- Symlinked directories are not followed, so instruction files that live behind a directory symlink are not detected. Link the files themselves instead.
 - It checks how instructions are *written*, not whether an agent will follow them or whether the resulting code is correct. Human review still matters.
 
 ## Related tools
@@ -318,6 +324,13 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the module layout, [docs/
 ## Security
 
 `acd` reads files from disk and writes only the report file you ask for. It makes no network calls, runs no commands found in the files it audits, and collects no telemetry. Markdown reports may contain short excerpts of your instruction files, so review them before sharing.
+
+It is safe to run against repositories you don't control, such as pull requests in CI:
+
+- Report paths must resolve inside the audited repository, including after following symlinks. A report is never written through a symlink. `--allow-outside` lifts the containment rule for a path you type on the command line; it never applies to `audit.output` from `.acdrc`.
+- Symlinked directories are not traversed, and symlinked files that point outside the audited directory are reported without being read.
+- Non-regular files and files over 1 MiB are not read.
+- Control characters and invisible Unicode in excerpts are neutralized before they reach your terminal or a Markdown report.
 
 See [SECURITY.md](./SECURITY.md) to report a vulnerability — use [GitHub Security Advisories](https://github.com/alipajand/agent-context-doctor/security/advisories/new), not a public issue.
 

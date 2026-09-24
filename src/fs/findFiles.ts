@@ -1,5 +1,4 @@
 import fg from 'fast-glob'
-import path from 'node:path'
 
 const CONTEXT_PATTERNS = [
   'AGENTS.md',
@@ -25,19 +24,31 @@ const IGNORE_DIRS = [
   '**/coverage/**',
 ]
 
+/**
+ * Find context files under `repoPath`. Symlinked directories are not traversed,
+ * so a link such as `.codex -> /` cannot walk the audit outside the repository.
+ * Symlinked files are still returned; callers decide whether their targets are
+ * safe to read.
+ */
 export async function findContextFiles(
   repoPath: string,
   extraIgnore: string[] = [],
 ): Promise<string[]> {
   const ignore = [...IGNORE_DIRS, ...extraIgnore]
 
-  const files = await fg(CONTEXT_PATTERNS, {
+  const entries = await fg(CONTEXT_PATTERNS, {
     cwd: repoPath,
     ignore,
     absolute: true,
     dot: true,
     caseSensitiveMatch: false,
+    followSymbolicLinks: false,
+    onlyFiles: false,
+    objectMode: true,
   })
 
-  return files.sort()
+  return entries
+    .filter((entry) => !entry.dirent.isDirectory())
+    .map((entry) => entry.path)
+    .sort()
 }

@@ -1,4 +1,5 @@
 import pc from 'picocolors'
+import { toDisplayText } from '../text/displayText.js'
 import type { AuditResult, ScoreGrade } from '../types.js'
 
 function severityColor(severity: string): string {
@@ -33,7 +34,7 @@ export function printTerminalReport(result: AuditResult): void {
   console.log()
   console.log(pc.bold(pc.white('Agent Context Doctor')))
   console.log(pc.dim('─'.repeat(50)))
-  console.log(`${pc.bold('Repo:')}    ${repoPath}`)
+  console.log(`${pc.bold('Repo:')}    ${toDisplayText(repoPath)}`)
   console.log(`${pc.bold('Files:')}   ${summary.fileCount}`)
 
   const issueLabel =
@@ -49,7 +50,9 @@ export function printTerminalReport(result: AuditResult): void {
     console.log()
     console.log(pc.bold('Context Files:'))
     for (const f of files) {
-      console.log(`  ${pc.green('✓')} ${f.path} ${pc.dim(`(${f.kind}, ${f.bytes}B)`)}`)
+      const marker = f.skipped ? pc.yellow('!') : pc.green('✓')
+      const detail = f.skipped ? `${f.kind}, not read: ${f.skipped}` : `${f.kind}, ${f.bytes}B`
+      console.log(`  ${marker} ${toDisplayText(f.path)} ${pc.dim(`(${detail})`)}`)
     }
   }
 
@@ -58,11 +61,13 @@ export function printTerminalReport(result: AuditResult): void {
     console.log(pc.bold('Issues:'))
     for (const issue of issues) {
       const loc = issue.line ? `:${issue.line}` : ''
-      const fileRef = issue.file !== result.repoPath ? `${issue.file}${loc}` : issue.file
-      console.log(`  ${severityColor(issue.severity)} ${fileRef} — ${issue.message}`)
-      console.log(`    ${pc.dim('Recommendation:')} ${issue.recommendation}`)
+      const fileRef = toDisplayText(
+        issue.file !== result.repoPath ? `${issue.file}${loc}` : issue.file,
+      )
+      console.log(`  ${severityColor(issue.severity)} ${fileRef} — ${toDisplayText(issue.message)}`)
+      console.log(`    ${pc.dim('Recommendation:')} ${toDisplayText(issue.recommendation)}`)
       if (issue.evidence) {
-        console.log(`    ${pc.dim('Evidence:')} ${issue.evidence}`)
+        console.log(`    ${pc.dim('Evidence:')} ${toDisplayText(issue.evidence)}`)
       }
     }
   } else {

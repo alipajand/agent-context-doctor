@@ -40,10 +40,13 @@ A detected agent context file.
 ```ts
 type ContextFileKind = 'agents' | 'claude' | 'cursor' | 'copilot' | 'codex' | 'prompt' | 'unknown'
 
+type ContextFileSkipReason = 'outside-repo' | 'not-a-file' | 'too-large'
+
 type ContextFile = {
   path: string           // Relative path from repoRoot
   kind: ContextFileKind
-  bytes: number
+  bytes: number          // 0 when the file was not inspected
+  skipped?: ContextFileSkipReason // Set when the file was detected but not read
 }
 ```
 
@@ -222,18 +225,19 @@ function toMarkdownReport(result: AuditResult): string
 
 ### `findContextFiles(repoPath, ignoreFiles?)`
 
-Globs for all known context file patterns under `repoPath`.
+Globs for all known context file patterns under `repoPath`. Symlinked directories are not traversed; symlinked files are returned so callers can check where they point.
 
 ```ts
 async function findContextFiles(repoPath: string, ignoreFiles?: string[]): Promise<string[]>
 ```
 
-### `readTextFile(absolutePath)`
+### `readTextFile(absolutePath, maxBytes?)`
 
-Reads a UTF-8 file. Returns empty string on error.
+Reads a regular UTF-8 file. Returns an empty string on error, for non-regular files (FIFOs, devices, directories), and for files larger than `maxBytes` (default `MAX_TEXT_FILE_BYTES`, 1 MiB).
 
 ```ts
-async function readTextFile(absolutePath: string): Promise<string>
+const MAX_TEXT_FILE_BYTES: number
+async function readTextFile(absolutePath: string, maxBytes?: number): Promise<string>
 ```
 
 ### `getFileBytes(absolutePath)`
@@ -246,19 +250,37 @@ async function getFileBytes(absolutePath: string): Promise<number>
 
 ### `readPackageScripts(repoPath)`
 
-Reads `package.json` and returns the `scripts` object. Returns `null` if no `package.json` is found.
+Reads `package.json` and returns its string-valued `scripts` entries. Returns `null` if no readable `package.json` is found, and `{}` when `scripts` is missing or not an object.
 
 ```ts
 type PackageJsonScripts = Record<string, string>
 async function readPackageScripts(repoPath: string): Promise<PackageJsonScripts | null>
 ```
 
-### `writeReport(outputPath, content, repoPath)`
+### `resolveOutputPath(repoPath, outputPath, opts?)`
 
-Writes a text report to `outputPath` (resolved relative to `repoPath`). Returns the absolute path written.
+Resolves `outputPath` against `repoPath` and throws `OutputPathError` unless the result stays inside the repository, both lexically and after resolving symlinks in the part of the path that already exists. `opts.allowOutside` skips the containment check.
 
 ```ts
-async function writeReport(outputPath: string, content: string, repoPath: string): Promise<string>
+class OutputPathError extends Error {}
+function resolveOutputPath(
+  repoPath: string,
+  outputPath: string,
+  opts?: { allowOutside?: boolean },
+): string
+```
+
+### `writeReport(outputPath, content, repoPath, opts?)`
+
+Resolves the path with `resolveOutputPath`, creates parent directories, and writes the report. Refuses to write through a symbolic link at the final path component. Returns the absolute path written.
+
+```ts
+async function writeReport(
+  outputPath: string,
+  content: string,
+  repoPath: string,
+  opts?: { allowOutside?: boolean },
+): Promise<string>
 ```
 
 ---
@@ -267,10 +289,10 @@ async function writeReport(outputPath: string, content: string, repoPath: string
 
 ### `initRepo(repoPath, opts?)`
 
-Creates a starter `AGENTS.md` in the repository. Safe by default — skips if file exists unless `opts.force` is set.
+Creates a starter `AGENTS.md` in the repository. Safe by default — skips if file exists unless `opts.force` is set, and never writes through an `AGENTS.md` symlink (returns `symlink`).
 
 ```ts
-type InitResult = { status: 'created' | 'overwritten' | 'already-exists'; path: string }
+type InitResult = { status: 'created' | 'overwritten' | 'already-exists' | 'symlink'; path: string }
 
 async function initRepo(repoPath: string, opts?: { force?: boolean }): Promise<InitResult>
 ```

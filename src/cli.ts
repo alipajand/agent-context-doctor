@@ -7,6 +7,9 @@ import { printTerminalReport } from './report/terminalReport.js'
 import { toJsonReport } from './report/jsonReport.js'
 import { toMarkdownReport } from './report/markdownReport.js'
 import { writeReport } from './fs/writeReport.js'
+import { OutputPathError, resolveOutputPath } from './fs/resolveOutputPath.js'
+import { isWithin } from './fs/safePath.js'
+import { toDisplayText } from './text/displayText.js'
 import { loadConfig } from './config/loadConfig.js'
 import { initRepo } from './init/initRepo.js'
 import { AGENTS_TEMPLATE } from './init/template.js'
@@ -24,6 +27,20 @@ function shouldFail(result: { issues: Array<{ severity: Severity }> }, failOn: S
   return result.issues.some((i) => SEVERITY_ORDER[i.severity] >= threshold)
 }
 
+function fail(message: string): never {
+  process.stderr.write(`${message}\n`)
+  process.exit(1)
+}
+
+function resolveOutputOrExit(repoPath: string, output: string, allowOutside: boolean): string {
+  try {
+    return resolveOutputPath(repoPath, output, { allowOutside })
+  } catch (err) {
+    if (err instanceof OutputPathError) fail(err.message)
+    throw err
+  }
+}
+
 const program = new Command()
 
 program
@@ -35,7 +52,8 @@ program
   .command('audit [repoPath]')
   .description('Audit agent context files in the repository')
   .option('--json', 'Output results as JSON to stdout')
-  .option('--output <path>', 'Write Markdown report to a file')
+  .option('--output <path>', 'Write Markdown report to a file inside the audited repo')
+  .option('--allow-outside', 'Allow --output to write outside the audited repository')
   .option(
     '--fail-on <severity>',
     'Exit non-zero if any issue at or above this severity is found (low|medium|high)',
@@ -43,7 +61,7 @@ program
   .action(
     async (
       cliRepoPath: string | undefined,
-      opts: { json?: boolean; output?: string; failOn?: string },
+      opts: { json?: boolean; output?: string; allowOutside?: boolean; failOn?: string },
     ) => {
       // Determine config search dir: CLI path if given, otherwise cwd
       const configSearchDir = path.resolve(cliRepoPath ?? process.cwd())
@@ -56,19 +74,35 @@ program
       }
 
       // Resolve repoPath: CLI arg > config.audit.repoPath > cwd
-      const resolvedRepo = cliRepoPath
-        ? path.resolve(cliRepoPath)
-        : config?.audit?.repoPath
-          ? path.resolve(configSearchDir, config.audit.repoPath)
-          : path.resolve(process.cwd())
+      let resolvedRepo = path.resolve(cliRepoPath ?? process.cwd())
+      if (!cliRepoPath && config?.audit?.repoPath) {
+        resolvedRepo = path.resolve(configSearchDir, config.audit.repoPath)
+        if (!isWithin(configSearchDir, resolvedRepo)) {
+          fail(`Config error: audit.repoPath must stay inside ${configSearchDir}`)
+        }
+      }
 
       // CLI flags override config
       const useJson = opts.json ?? config?.audit?.json ?? false
-      const outputPath = opts.output ?? config?.audit?.output
       const failOnRaw = opts.failOn ?? config?.audit?.failOn
 
+      // --allow-outside only widens a path the user typed; a path from .acdrc
+      // comes from the audited repository and is always confined to it.
+      const allowOutside = opts.allowOutside === true && opts.output !== undefined
+      let outputPath: string | undefined
+      if (opts.output) {
+        outputPath = resolveOutputOrExit(resolvedRepo, opts.output, allowOutside)
+      } else if (config?.audit?.output) {
+        try {
+          outputPath = resolveOutputPath(resolvedRepo, config.audit.output)
+        } catch (err) {
+          if (!(err instanceof OutputPathError)) throw err
+          fail(`Config error: audit.output must resolve inside ${resolvedRepo}`)
+        }
+      }
+
       if (!useJson) {
-        process.stderr.write(`Auditing ${resolvedRepo}...\n`)
+        process.stderr.write(`Auditing ${toDisplayText(resolvedRepo)}...\n`)
       }
 
       const result = await auditRepo(resolvedRepo, {
@@ -79,8 +113,15 @@ program
 
       if (outputPath) {
         const mdContent = toMarkdownReport(result)
-        const writtenPath = await writeReport(outputPath, mdContent, resolvedRepo)
-        process.stderr.write(`Markdown report written to ${writtenPath}\n`)
+        try {
+          const writtenPath = await writeReport(outputPath, mdContent, resolvedRepo, {
+            allowOutside,
+          })
+          process.stderr.write(`Markdown report written to ${writtenPath}\n`)
+        } catch (err) {
+          if (err instanceof OutputPathError) fail(err.message)
+          throw err
+        }
       }
 
       if (useJson) {
@@ -119,11 +160,12 @@ program
     const files = await detectContextFiles(resolvedRepo, config?.rules?.ignoreFiles)
 
     if (files.length === 0) {
-      console.log(`No agent context files found in ${resolvedRepo}`)
+      console.log(`No agent context files found in ${toDisplayText(resolvedRepo)}`)
     } else {
-      console.log(`Agent context files in ${resolvedRepo}:`)
+      console.log(`Agent context files in ${toDisplayText(resolvedRepo)}:`)
       for (const f of files) {
-        console.log(`  ${f.path}  [${f.kind}]  ${f.bytes}B`)
+        const size = f.skipped ? `not read: ${f.skipped}` : `${f.bytes}B`
+        console.log(`  ${toDisplayText(f.path)}  [${f.kind}]  ${size}`)
       }
     }
   })
@@ -144,6 +186,10 @@ program
     if (result.status === 'already-exists') {
       process.stderr.write('AGENTS.md already exists. Use --force to overwrite.\n')
       process.exit(1)
+    }
+
+    if (result.status === 'symlink') {
+      fail('AGENTS.md is a symbolic link. Refusing to write through it; remove the link first.')
     }
 
     const verb = result.status === 'created' ? 'Created' : 'Overwrote'

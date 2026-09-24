@@ -1,7 +1,9 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { findContextFiles } from '../fs/findFiles.js'
-import { getFileBytes } from '../fs/readTextFile.js'
-import type { ContextFile, ContextFileKind } from '../types.js'
+import { MAX_TEXT_FILE_BYTES } from '../fs/readTextFile.js'
+import { isWithin } from '../fs/safePath.js'
+import type { ContextFile, ContextFileKind, ContextFileSkipReason } from '../types.js'
 
 function classifyFile(filePath: string): ContextFileKind {
   const base = path.basename(filePath).toLowerCase()
@@ -17,20 +19,42 @@ function classifyFile(filePath: string): ContextFileKind {
   return 'unknown'
 }
 
+async function inspectFile(
+  realRepo: string,
+  filePath: string,
+): Promise<{ bytes: number; skipped?: ContextFileSkipReason }> {
+  let realPath: string
+  try {
+    realPath = await fs.realpath(filePath)
+  } catch {
+    return { bytes: 0, skipped: 'not-a-file' }
+  }
+
+  // Never stat or read link targets outside the audited directory: their size
+  // and contents could otherwise leak into reports and CI logs.
+  if (!isWithin(realRepo, realPath)) return { bytes: 0, skipped: 'outside-repo' }
+
+  const stat = await fs.stat(realPath).catch(() => null)
+  if (!stat?.isFile()) return { bytes: 0, skipped: 'not-a-file' }
+  if (stat.size > MAX_TEXT_FILE_BYTES) return { bytes: stat.size, skipped: 'too-large' }
+  return { bytes: stat.size }
+}
+
 export async function detectContextFiles(
   repoPath: string,
   ignoreFiles: string[] = [],
 ): Promise<ContextFile[]> {
   const filePaths = await findContextFiles(repoPath, ignoreFiles)
+  const realRepo = await fs.realpath(repoPath).catch(() => path.resolve(repoPath))
 
   const results: ContextFile[] = []
   for (const filePath of filePaths) {
-    const rel = path.relative(repoPath, filePath)
-    const bytes = await getFileBytes(filePath)
+    const { bytes, skipped } = await inspectFile(realRepo, filePath)
     results.push({
-      path: rel,
+      path: path.relative(repoPath, filePath),
       kind: classifyFile(filePath),
       bytes,
+      ...(skipped ? { skipped } : {}),
     })
   }
 

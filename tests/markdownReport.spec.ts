@@ -192,3 +192,46 @@ describe('toJsonReport', () => {
     expect(issue.line).toBe(3)
   })
 })
+
+describe('toMarkdownReport escaping', () => {
+  const hostile: AuditResult = {
+    ...sampleResult,
+    files: [{ path: 'docs/prompts/a|b`c.md', kind: 'prompt', bytes: 1 }],
+    issues: [
+      {
+        id: 'placeholder-AGENTS.md-0',
+        severity: 'medium',
+        category: 'placeholder-content',
+        file: 'AGENTS.md',
+        line: 1,
+        message: 'Placeholder content detected: "<!-- Describe the project -->"',
+        recommendation: 'Replace placeholder content.',
+        evidence: 'use `pnpm test` | then <b>report</b>',
+      },
+    ],
+  }
+
+  it('escapes HTML so excerpts cannot open comments or tags', () => {
+    const md = toMarkdownReport(hostile)
+    expect(md).not.toContain('<!--')
+    expect(md).toContain('&lt;!-- Describe the project --&gt;')
+  })
+
+  it('wraps evidence containing backticks in a longer code fence', () => {
+    const md = toMarkdownReport(hostile)
+    expect(md).toContain('Evidence: ``use `pnpm test` | then <b>report</b>``')
+  })
+
+  it('escapes pipes in file names inside table cells', () => {
+    const md = toMarkdownReport(hostile)
+    expect(md).toContain('| ``docs/prompts/a\\|b`c.md`` | prompt | 1 |')
+  })
+
+  it('strips terminal control characters', () => {
+    const md = toMarkdownReport({
+      ...hostile,
+      issues: [{ ...hostile.issues[0], evidence: 'a\u001b[31mb' }],
+    })
+    expect(md).not.toContain('\u001b')
+  })
+})
