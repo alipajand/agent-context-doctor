@@ -1,6 +1,6 @@
 {
   "name": "agent-context-doctor",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A deterministic CLI that audits repository agent context files for quality, safety, contradictions, stale commands, and generic placeholder content.",
   "type": "module",
   "main": "./dist/index.js",

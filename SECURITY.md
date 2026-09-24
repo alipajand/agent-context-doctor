@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.x     | ✓ Current |
+| 1.x     | ✓ Current |
+| 0.x     | ✗         |
 
 `acd` requires Node.js 22.12 or later.
 

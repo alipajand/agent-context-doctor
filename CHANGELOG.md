@@ -8,6 +8,8 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-09-24
+
 ### Added
 
 - Claude Code security checks under `agent-config`:
@@ -92,5 +94,6 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 - Dependabot config for automated dependency updates
 - GitHub Actions CI workflow
 
-[Unreleased]: https://github.com/alipajand/agent-context-doctor/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/alipajand/agent-context-doctor/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/alipajand/agent-context-doctor/releases/tag/v1.0.0
 [0.1.0]: https://github.com/alipajand/agent-context-doctor/releases/tag/v0.1.0
