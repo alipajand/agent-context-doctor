@@ -5,6 +5,7 @@ docs/agent-context-report.md
 *.tsbuildinfo
 .DS_Store
 .idea/
+.serena/
 .env
 .env.local
 .env.*.local
