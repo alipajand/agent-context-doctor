@@ -227,6 +227,15 @@ describe('toMarkdownReport escaping', () => {
     expect(md).toContain('| ``docs/prompts/a\\|b`c.md`` | prompt | 1 |')
   })
 
+  it('keeps a backslash from cancelling the pipe escape', () => {
+    const md = toMarkdownReport({
+      ...hostile,
+      files: [{ path: 'docs\\a\\|<img src=x>.md', kind: 'prompt', bytes: 1 }],
+    })
+    expect(md).toContain('| `docs/a/\\|<img src=x>.md` | prompt | 1 |')
+    expect(md).not.toMatch(/(^|[^\\])(\\\\)*\\\\\|/)
+  })
+
   it('strips terminal control characters', () => {
     const md = toMarkdownReport({
       ...hostile,

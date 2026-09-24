@@ -21,9 +21,11 @@ function codeSpan(str: string): string {
   return `${fence}${pad}${text}${pad}${fence}`
 }
 
-// GFM splits table rows on `|` even inside code spans unless it is escaped.
+// GFM splits table rows on `|` even inside code spans unless it is escaped,
+// and a backslash before the pipe would cancel that escape. Only file paths go
+// in table code spans, so backslashes become `/`.
 function tableCodeSpan(str: string): string {
-  return codeSpan(str).replace(/\|/g, '\\|')
+  return codeSpan(str).replace(/[\\|]/g, (char) => (char === '|' ? '\\|' : '/'))
 }
 
 function issueRow(issue: ContextIssue): string {

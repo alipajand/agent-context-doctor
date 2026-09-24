@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { readTextFile, getFileBytes } from '../src/fs/readTextFile.js'
+import { execFileSync } from 'node:child_process'
+import { readTextFile, readRegularFile, getFileBytes } from '../src/fs/readTextFile.js'
 
 let tmpDir: string
 
@@ -40,6 +41,25 @@ describe('readTextFile', () => {
     const file = path.join(tmpDir, 'multi.txt')
     await fs.writeFile(file, 'line1\nline2\n', 'utf-8')
     expect(await readTextFile(file)).toBe('line1\nline2\n')
+  })
+})
+
+describe('readRegularFile', () => {
+  it('reports why a file was not read', async () => {
+    const file = path.join(tmpDir, 'a.md')
+    await fs.writeFile(file, 'abc', 'utf-8')
+    expect(await readRegularFile(file)).toEqual({ status: 'ok', content: 'abc' })
+    expect(await readRegularFile(file, 2)).toEqual({ status: 'too-large' })
+    expect(await readRegularFile(tmpDir)).toEqual({ status: 'not-a-file' })
+    expect(await readRegularFile(path.join(tmpDir, 'nope'))).toEqual({ status: 'missing' })
+    expect(await readRegularFile(path.join(file, 'child'))).toEqual({ status: 'missing' })
+  })
+
+  it.skipIf(process.platform === 'win32')('does not wait on a FIFO', async () => {
+    const fifo = path.join(tmpDir, 'pipe.md')
+    execFileSync('mkfifo', [fifo])
+    expect(await readRegularFile(fifo)).toEqual({ status: 'not-a-file' })
+    expect(await readTextFile(fifo)).toBe('')
   })
 })
 
