@@ -101,6 +101,9 @@ export async function findContextFiles(
     followSymbolicLinks: false,
     onlyFiles: false,
     objectMode: true,
+    // A pattern such as `.clinerules/**/*.md` makes fast-glob scan
+    // `.clinerules` as a directory; when it is a file that can throw ENOTDIR.
+    suppressErrors: true,
   })
 
   return entries

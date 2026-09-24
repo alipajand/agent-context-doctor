@@ -12,6 +12,7 @@ export const KNOWN_SUPPRESSION_CATEGORIES: ReadonlySet<string> = new Set([
   'secrets',
   'broken-references',
   'file-size',
+  'frontmatter',
 ])
 
 export type SuppressionRule = {

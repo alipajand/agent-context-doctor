@@ -10,6 +10,7 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Added
 
+- `frontmatter` check: Cursor `.mdc` rules that can never be applied (no `alwaysApply: true`, `globs`, or `description`; medium) or have no frontmatter (low), Claude subagents and skills missing `name`/`description` (medium), Copilot `.instructions.md` without `applyTo` (low), and unclosed frontmatter blocks.
 - `agent-config` check for committed agent settings. Claude Code: `bypassPermissions` and unrestricted `Bash` allow rules (high), `enableAllProjectMcpServers` (medium). MCP configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, `.roo/mcp.json`): hardcoded credentials in `env`/headers (high, redacted), `npx`/`uvx` packages without a pinned version and plain-HTTP remote servers (medium). JSONC is supported, and config files that resolve outside the repository are not read.
 - `acd checks` lists every check ID with its severity and description (`--json` for machine output).
 - Library entry point: `import { auditRepo } from 'agent-context-doctor'` (`main`, `types`, and `exports` in `package.json`).
@@ -53,6 +54,7 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Fixed
 
+- File discovery passes `suppressErrors` to fast-glob, so a file where a directory pattern expects one (such as a `.clinerules` file) cannot abort the scan.
 - `command-alignment` reported prose such as "use pnpm for everything" (`for`), flags such as `pnpm -C dir test` (`-C`) and `--filter`, built-ins such as `pnpm exec`, `pnpm dlx`, `yarn workspace`, and `bun test`, and a second command on the same line was swallowed by the first. Workspace-targeted runs are now skipped, since their scripts live in another package.
 - The structural checks (safety boundaries, validation commands, final reporting) flagged every primary file on its own. A `CLAUDE.md` that just says "Follow AGENTS.md" lost up to 19 points, and each file in a `.cursor/rules/` set had to repeat every section. Guidance now counts when it appears in the file, in a context file it references, or in another primary file for the same tool. Nested `AGENTS.md` files get content checks only.
 - `risky-language` and `contradictions` treated safety guidance such as "Never skip tests" or "You should never bypass auth" as the risky instruction it forbids. Only "not" directly before the phrase was recognized as negation; the check now looks for negation anywhere earlier in the same clause.
