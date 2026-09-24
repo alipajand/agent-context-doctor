@@ -10,6 +10,8 @@ const VALID_CHECKS = [
   'contradictions',
   'hidden-characters',
   'secrets',
+  'broken-references',
+  'file-size',
 ] as const
 
 export const OUTPUT_FORMATS = ['terminal', 'json', 'markdown', 'sarif', 'github'] as const
@@ -32,6 +34,7 @@ export const AcdRcSchema = z.object({
       ignoreFiles: z.array(z.string()).optional(),
       disabledChecks: z.array(z.enum(VALID_CHECKS)).optional(),
       allowedMissingScripts: z.array(z.string()).optional(),
+      maxFileBytes: z.number().int().positive().optional(),
     })
     .optional(),
 })

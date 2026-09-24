@@ -49,6 +49,9 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkContradictions` | `contradictions.ts` | Cross-file directives that contradict each other (always run tests vs. skip tests) |
 | `checkHiddenCharacters` | `hiddenCharacters.ts` | Invisible Unicode (tag characters, bidi controls, zero-width characters) that can hide instructions; decodes tag-character text |
 | `checkSecrets` | `secrets.ts` | Credentials pasted into instruction files; evidence is redacted |
+| `checkBrokenReferences` | `brokenReferences.ts` | Links, inline-code paths, and `@imports` to files that do not exist (existence is resolved in `auditRepo`, never outside the repo) |
+| `checkFileSize` | `fileSize.ts` | Primary instruction files over the size budget |
+| `checkMakeTargets` | `commandAlignment.ts` | `make` targets referenced in instructions but missing from the Makefile |
 | `checkSkippedFile` | `skippedFiles.ts` | Context files that were detected but not read: links outside the repo, broken links, or files over 1 MiB |
 
 ## Scoring model

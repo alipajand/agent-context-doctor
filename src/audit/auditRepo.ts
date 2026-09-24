@@ -8,12 +8,18 @@ import { checkRiskyLanguage } from './checks/riskyLanguage.js'
 import {
   checkCommandAlignment,
   checkCommandsWithoutPackageJson,
+  checkMakeTargets,
+  parseMakeTargets,
 } from './checks/commandAlignment.js'
 import { checkContradictions } from './checks/contradictions.js'
 import { checkSkippedFile } from './checks/skippedFiles.js'
 import { checkHiddenCharacters } from './checks/hiddenCharacters.js'
 import { checkSecrets } from './checks/secrets.js'
 import { fingerprintIssue } from './baseline.js'
+import { checkBrokenReferences, extractFileReferences } from './checks/brokenReferences.js'
+import { checkFileSize, DEFAULT_MAX_FILE_BYTES } from './checks/fileSize.js'
+import { isWithin } from '../fs/safePath.js'
+import fs from 'node:fs/promises'
 import { computeScore } from './score.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
@@ -28,9 +34,58 @@ export type AuditOptions = {
   ignoreFiles?: string[]
   disabledChecks?: string[]
   allowedMissingScripts?: string[]
+  maxFileBytes?: number
 }
 
 type LoadedFile = { path: string; kind: ContextFileKind; content: string }
+
+/**
+ * References from `filePath` that resolve to nothing, trying the repository
+ * root and then the file's own directory. Paths that would resolve outside
+ * the repository are never probed.
+ */
+async function findMissingReferences(
+  repoPath: string,
+  filePath: string,
+  content: string,
+): Promise<Set<string>> {
+  const missing = new Set<string>()
+  const bases = [repoPath, path.resolve(repoPath, path.dirname(filePath))]
+
+  for (const { target } of extractFileReferences(content)) {
+    // ESM TypeScript imports name `.js` files whose source is `.ts`.
+    const names = /\.[cm]?js$/.test(target)
+      ? [target, target.replace(/\.([cm]?)js$/, '.$1ts'), target.replace(/\.js$/, '.tsx')]
+      : [target]
+    const candidates = bases
+      .flatMap((base) => names.map((name) => path.resolve(base, name)))
+      .filter((candidate) => isWithin(repoPath, candidate))
+    if (candidates.length === 0) continue
+
+    let found = false
+    for (const candidate of candidates) {
+      if (
+        await fs.stat(candidate).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        found = true
+        break
+      }
+    }
+    if (!found) missing.add(target)
+  }
+  return missing
+}
+
+async function readMakeTargets(repoPath: string): Promise<Set<string> | null> {
+  for (const name of ['GNUmakefile', 'makefile', 'Makefile']) {
+    const content = await readTextFile(path.join(repoPath, name))
+    if (content !== '') return parseMakeTargets(content)
+  }
+  return null
+}
 
 function toPosix(p: string): string {
   return p.replace(/\\/g, '/')
@@ -76,6 +131,7 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
 
   const contextFiles = await detectContextFiles(absoluteRepo, opts.ignoreFiles ?? [])
   const packageScripts = await readPackageScripts(absoluteRepo)
+  const makeTargets = await readMakeTargets(absoluteRepo)
 
   const issues: ContextIssue[] = []
 
@@ -117,6 +173,11 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
       fileIssues.push(...checkPlaceholderContent(filePath, content))
     }
 
+    if (!disabled.has('broken-references')) {
+      const missing = await findMissingReferences(absoluteRepo, filePath, content)
+      fileIssues.push(...checkBrokenReferences(filePath, content, missing))
+    }
+
     if (!disabled.has('risky-language')) {
       fileIssues.push(...checkRiskyLanguage(filePath, content))
     }
@@ -131,9 +192,15 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
       } else {
         fileIssues.push(...checkCommandsWithoutPackageJson(filePath, content))
       }
+      fileIssues.push(...checkMakeTargets(filePath, content, makeTargets))
     }
 
     if (isPrimaryInstructionFile(filePath)) {
+      if (!disabled.has('file-size')) {
+        fileIssues.push(
+          ...checkFileSize(filePath, content, opts.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES),
+        )
+      }
       const structural = structuralContext(filePath, fileContents)
       if (!disabled.has('safety-boundaries')) {
         fileIssues.push(...checkSafetyBoundaries(filePath, structural))
