@@ -148,6 +148,26 @@ describe('claudeSettingsFindings', () => {
   })
 })
 
+describe('checkAgentConfig evidence lines', () => {
+  it('points at the value, not an earlier line that contains it', () => {
+    const issues = checkAgentConfig(
+      '.claude/settings.json',
+      JSON.stringify(
+        {
+          permissions: {
+            allow: ['Edit(~/.zshrc)'],
+            additionalDirectories: ['~'],
+            deny: ['Read(./.env)'],
+          },
+        },
+        null,
+        2,
+      ),
+    )
+    expect(issues.find((i) => i.message.includes('additionalDirectories'))?.evidence).toBe('"~"')
+  })
+})
+
 describe('referencedScripts', () => {
   it('lists repository scripts run by hooks and the status line', () => {
     expect(
