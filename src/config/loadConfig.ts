@@ -1,29 +1,22 @@
-import type { Stats } from 'node:fs'
-import fs from 'node:fs/promises'
 import path from 'node:path'
-import { MAX_TEXT_FILE_BYTES } from '../fs/readTextFile.js'
+import { MAX_TEXT_FILE_BYTES, readRegularFile } from '../fs/readTextFile.js'
 import { AcdRcSchema } from './schema.js'
 import type { AcdRc } from './schema.js'
 
 export async function loadConfig(searchDir: string): Promise<AcdRc | null> {
   const configPath = path.join(searchDir, '.acdrc')
 
-  let stat: Stats
-  try {
-    stat = await fs.stat(configPath)
-  } catch {
-    // No .acdrc present — not an error
-    return null
-  }
-
-  if (!stat.isFile()) {
+  const read = await readRegularFile(configPath, MAX_TEXT_FILE_BYTES)
+  // No .acdrc present — not an error
+  if (read.status === 'missing') return null
+  if (read.status === 'error') throw read.error
+  if (read.status === 'not-a-file') {
     throw new Error(`.acdrc at ${configPath} is not a regular file`)
   }
-  if (stat.size > MAX_TEXT_FILE_BYTES) {
+  if (read.status === 'too-large') {
     throw new Error(`.acdrc at ${configPath} is larger than ${MAX_TEXT_FILE_BYTES} bytes`)
   }
-
-  const raw = await fs.readFile(configPath, 'utf-8')
+  const raw = read.content
 
   let parsed: unknown
   try {

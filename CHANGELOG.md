@@ -57,6 +57,8 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 - Reports and `AGENTS.md` from `acd init` are never written through a symlink, including dangling ones.
 - Symlinked directories are no longer traversed. Symlinked context files that point outside the audited directory are reported without being read, so an audited repo cannot pull files such as `/proc/self/environ` into reports or CI logs.
 - Only regular files up to 1 MiB are read, so FIFOs, devices, or very large files cannot hang an audit or exhaust memory.
+- File type and size are checked on the opened file rather than the path, so a file cannot be swapped for a FIFO or a larger file between the check and the read. `acd init` creates `AGENTS.md` exclusively (`O_EXCL`), so a file appearing between the existence check and the write is never truncated without `--force`.
+- File paths in Markdown report tables use `/` separators, so a backslash cannot cancel the escaped `|` and split a table cell open.
 - Control characters and invisible Unicode are neutralized in terminal and Markdown output, and Markdown reports escape HTML. Excerpts such as `<!-- describe -->` no longer turn the rest of a report into an HTML comment.
 - Bumped `vitest` to 4.1.11 for the `@vitest/mocker` path-traversal advisory.
 
