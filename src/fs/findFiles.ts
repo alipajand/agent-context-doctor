@@ -1,19 +1,51 @@
 import fg from 'fast-glob'
+import path from 'node:path'
 
-const CONTEXT_PATTERNS = [
+export const CONTEXT_PATTERNS = [
+  // Cross-tool and model-specific root files, plus nested copies in monorepos
   'AGENTS.md',
+  'AGENT.md',
   'CLAUDE.md',
   'claude.md',
+  'GEMINI.md',
+  '**/AGENTS.md',
+  '**/CLAUDE.md',
+  '**/GEMINI.md',
+  // Claude Code
   '.claude/CLAUDE.md',
   '.claude/claude.md',
-  '.claude/commands/*.md',
+  '.claude/commands/**/*.md',
+  '.claude/agents/**/*.md',
+  '.claude/skills/**/SKILL.md',
+  // Cursor
   '.cursorrules',
-  '.cursor/rules/*.mdc',
+  '.cursor/rules/**/*.mdc',
+  '.cursor/rules/**/*.md',
+  // GitHub Copilot
   '.github/copilot-instructions.md',
+  '.github/instructions/**/*.md',
+  '.github/prompts/**/*.prompt.md',
+  '.github/chatmodes/**/*.chatmode.md',
+  '.github/agents/**/*.md',
+  // Gemini Code Assist
+  '.gemini/styleguide.md',
+  // Windsurf, Cline, Roo, Kiro, Junie, Augment, Continue, Goose
+  '.windsurfrules',
+  '.windsurf/rules/**/*.md',
+  '.clinerules',
+  '.clinerules/**/*.md',
+  '.roorules',
+  '.roo/rules*/**/*.md',
+  '.kiro/steering/**/*.md',
+  '.junie/guidelines.md',
+  '.augment-guidelines',
+  '.augment/rules/**/*.md',
+  '.continue/rules/**/*.md',
+  '.goosehints',
+  // Codex and shared prompt libraries
+  '.codex/**/*.md',
   'docs/prompts/**/*.md',
   'prompts/**/*.md',
-  '.codex/**/*.md',
-  '.github/instructions/**/*.md',
 ]
 
 const IGNORE_DIRS = [
@@ -22,7 +54,31 @@ const IGNORE_DIRS = [
   '**/build/**',
   '**/.git/**',
   '**/coverage/**',
+  // Vendored code and test fixtures carry other projects' instructions.
+  '**/vendor/**',
+  '**/fixtures/**',
+  '**/__fixtures__/**',
+  '**/testdata/**',
+  '**/.venv/**',
+  '**/venv/**',
+  '**/target/**',
+  '**/.next/**',
+  '**/.turbo/**',
 ]
+
+// Nested copies only count with the exact names tools look for, so a file such
+// as docs/agents.md (documentation about support agents) is not picked up.
+const NESTED_EXACT_NAMES = new Set(['AGENTS.md', 'CLAUDE.md', 'GEMINI.md'])
+const NESTED_LOWERCASE_NAMES = new Set(['agents.md', 'claude.md', 'gemini.md'])
+
+function isUnwantedNestedMatch(relativePath: string): boolean {
+  const parts = relativePath.split('/')
+  if (parts.length < 2) return false
+  const base = parts[parts.length - 1]
+  const parent = parts[parts.length - 2]
+  if (parent === '.claude') return false
+  return NESTED_LOWERCASE_NAMES.has(base.toLowerCase()) && !NESTED_EXACT_NAMES.has(base)
+}
 
 /**
  * Find context files under `repoPath`. Symlinked directories are not traversed,
@@ -39,7 +95,7 @@ export async function findContextFiles(
   const entries = await fg(CONTEXT_PATTERNS, {
     cwd: repoPath,
     ignore,
-    absolute: true,
+    absolute: false,
     dot: true,
     caseSensitiveMatch: false,
     followSymbolicLinks: false,
@@ -49,6 +105,7 @@ export async function findContextFiles(
 
   return entries
     .filter((entry) => !entry.dirent.isDirectory())
-    .map((entry) => entry.path)
+    .filter((entry) => !isUnwantedNestedMatch(entry.path))
+    .map((entry) => path.resolve(repoPath, entry.path))
     .sort()
 }

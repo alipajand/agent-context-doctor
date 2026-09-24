@@ -38,7 +38,10 @@ type ContextIssue = {
 A detected agent context file.
 
 ```ts
-type ContextFileKind = 'agents' | 'claude' | 'cursor' | 'copilot' | 'codex' | 'prompt' | 'unknown'
+type ContextFileKind =
+  | 'agents' | 'claude' | 'cursor' | 'copilot' | 'codex' | 'gemini'
+  | 'windsurf' | 'cline' | 'roo' | 'kiro' | 'junie' | 'augment' | 'continue' | 'goose'
+  | 'prompt' | 'unknown'
 
 type ContextFileSkipReason = 'outside-repo' | 'not-a-file' | 'too-large'
 
@@ -106,12 +109,12 @@ Discovers and classifies all agent context files under `repoPath`.
 async function detectContextFiles(repoPath: string, ignoreFiles?: string[]): Promise<ContextFile[]>
 ```
 
-### `isPrimaryInstructionFile(filePath)`
+### `isPrimaryInstructionFile(relativePath)`
 
-Returns `true` for files that should be checked by structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`).
+Returns `true` for files that should be checked by structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`). `relativePath` is relative to the repository root: root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md` are primary, nested copies are not.
 
 ```ts
-function isPrimaryInstructionFile(filePath: string): boolean
+function isPrimaryInstructionFile(relativePath: string): boolean
 ```
 
 ---

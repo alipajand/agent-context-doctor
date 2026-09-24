@@ -195,31 +195,107 @@ describe('detectContextFiles', () => {
 })
 
 describe('isPrimaryInstructionFile', () => {
-  it('treats AGENTS.md as primary', () => {
-    expect(isPrimaryInstructionFile('/repo/AGENTS.md')).toBe(true)
+  it.each([
+    'AGENTS.md',
+    'CLAUDE.md',
+    'GEMINI.md',
+    'AGENT.md',
+    '.cursorrules',
+    '.windsurfrules',
+    '.clinerules',
+    '.goosehints',
+    '.claude/CLAUDE.md',
+    '.cursor/rules/project.mdc',
+    '.cursor/rules/backend/api.mdc',
+    '.github/copilot-instructions.md',
+    '.gemini/styleguide.md',
+    '.windsurf/rules/style.md',
+    '.clinerules/01-style.md',
+    '.roo/rules-code/style.md',
+    '.kiro/steering/product.md',
+    '.junie/guidelines.md',
+    '.continue/rules/review.md',
+  ])('treats %s as primary', (p) => {
+    expect(isPrimaryInstructionFile(p)).toBe(true)
   })
 
-  it('treats CLAUDE.md as primary', () => {
-    expect(isPrimaryInstructionFile('/repo/CLAUDE.md')).toBe(true)
-  })
-
-  it('treats .cursorrules as primary', () => {
-    expect(isPrimaryInstructionFile('/repo/.cursorrules')).toBe(true)
-  })
-
-  it('treats .cursor/rules/*.mdc as primary', () => {
-    expect(isPrimaryInstructionFile('/repo/.cursor/rules/project.mdc')).toBe(true)
-  })
-
-  it('treats copilot-instructions as primary', () => {
-    expect(isPrimaryInstructionFile('/repo/.github/copilot-instructions.md')).toBe(true)
-  })
-
-  it('treats prompt files as non-primary', () => {
-    expect(isPrimaryInstructionFile('/repo/docs/prompts/review.md')).toBe(false)
+  it.each([
+    'docs/prompts/review.md',
+    'packages/web/AGENTS.md',
+    'apps/api/CLAUDE.md',
+    '.claude/commands/review.md',
+    '.claude/agents/reviewer.md',
+    '.claude/skills/deploy/SKILL.md',
+    '.github/prompts/fix.prompt.md',
+    '.github/instructions/tests.instructions.md',
+  ])('treats %s as supplementary', (p) => {
+    expect(isPrimaryInstructionFile(p)).toBe(false)
   })
 
   it('handles Windows-style separators', () => {
-    expect(isPrimaryInstructionFile('C:\\repo\\.cursor\\rules\\project.mdc')).toBe(true)
+    expect(isPrimaryInstructionFile('.cursor\\rules\\project.mdc')).toBe(true)
+  })
+})
+
+describe('detectContextFiles tool coverage', () => {
+  async function write(rel: string, content = '# rules'): Promise<void> {
+    const full = path.join(tmpDir, rel)
+    await fs.mkdir(path.dirname(full), { recursive: true })
+    await fs.writeFile(full, content)
+  }
+
+  it.each([
+    ['GEMINI.md', 'gemini'],
+    ['AGENT.md', 'agents'],
+    ['.windsurfrules', 'windsurf'],
+    ['.windsurf/rules/style.md', 'windsurf'],
+    ['.clinerules', 'cline'],
+    ['.roo/rules/style.md', 'roo'],
+    ['.kiro/steering/tech.md', 'kiro'],
+    ['.junie/guidelines.md', 'junie'],
+    ['.augment-guidelines', 'augment'],
+    ['.continue/rules/review.md', 'continue'],
+    ['.goosehints', 'goose'],
+    ['.gemini/styleguide.md', 'gemini'],
+    ['.claude/agents/reviewer.md', 'claude'],
+    ['.claude/skills/deploy/SKILL.md', 'claude'],
+    ['.claude/commands/git/commit.md', 'claude'],
+    ['.cursor/rules/backend/api.mdc', 'cursor'],
+    ['.github/prompts/fix.prompt.md', 'copilot'],
+    ['.github/chatmodes/plan.chatmode.md', 'copilot'],
+  ])('detects %s as %s', async (rel, kind) => {
+    await write(rel)
+    const files = await detectContextFiles(tmpDir)
+    expect(files.map((f) => [f.path.split(path.sep).join('/'), f.kind])).toContainEqual([rel, kind])
+  })
+
+  it('detects .clinerules as a directory of rule files', async () => {
+    await write('.clinerules/01-style.md')
+    const files = await detectContextFiles(tmpDir)
+    expect(files.map((f) => f.path.split(path.sep).join('/'))).toEqual(['.clinerules/01-style.md'])
+  })
+
+  it('detects nested AGENTS.md and CLAUDE.md in monorepo packages', async () => {
+    await write('packages/web/AGENTS.md')
+    await write('apps/api/CLAUDE.md')
+    const files = await detectContextFiles(tmpDir)
+    expect(files.map((f) => f.path.split(path.sep).join('/')).sort()).toEqual([
+      'apps/api/CLAUDE.md',
+      'packages/web/AGENTS.md',
+    ])
+  })
+
+  it('ignores nested files whose name only matches case-insensitively', async () => {
+    await write('docs/agents.md', '# Our support agents')
+    const files = await detectContextFiles(tmpDir)
+    expect(files).toEqual([])
+  })
+
+  it('ignores vendored code and test fixtures', async () => {
+    await write('vendor/lib/AGENTS.md')
+    await write('tests/fixtures/repo/AGENTS.md')
+    await write('src/__fixtures__/CLAUDE.md')
+    const files = await detectContextFiles(tmpDir)
+    expect(files).toEqual([])
   })
 })

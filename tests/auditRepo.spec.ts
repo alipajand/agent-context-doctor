@@ -171,3 +171,71 @@ Include: files changed, commands run, tests passed, known limitations.
     expect(result.issues[0].severity).toBe('medium')
   })
 })
+
+describe('auditRepo structural checks across related files', () => {
+  const fullGuidance = [
+    '# Agents',
+    'Run `pnpm test` before finishing.',
+    'Ask before changing auth or billing.',
+    '## Final report',
+    'List files changed and commands run.',
+  ].join('\n')
+
+  async function write(rel: string, content: string): Promise<void> {
+    const full = path.join(tmpDir, rel)
+    await fs.mkdir(path.dirname(full), { recursive: true })
+    await fs.writeFile(full, content)
+  }
+
+  function structuralIssues(issues: Array<{ category: string; file: string }>, file: string) {
+    return issues.filter(
+      (i) =>
+        i.file === file &&
+        ['safety-boundaries', 'validation-commands', 'final-reporting'].includes(i.category),
+    )
+  }
+
+  it('treats a CLAUDE.md that points at AGENTS.md as covered', async () => {
+    await write('AGENTS.md', fullGuidance)
+    await write('CLAUDE.md', 'Follow the rules in AGENTS.md.')
+    const result = await auditRepo(tmpDir)
+    expect(structuralIssues(result.issues, 'CLAUDE.md')).toEqual([])
+  })
+
+  it('treats an @AGENTS.md import as a reference', async () => {
+    await write('AGENTS.md', fullGuidance)
+    await write('CLAUDE.md', '@AGENTS.md')
+    const result = await auditRepo(tmpDir)
+    expect(structuralIssues(result.issues, 'CLAUDE.md')).toEqual([])
+  })
+
+  it('still flags a CLAUDE.md that neither contains nor references the guidance', async () => {
+    await write('AGENTS.md', fullGuidance)
+    await write('CLAUDE.md', 'Be concise.')
+    const result = await auditRepo(tmpDir)
+    expect(
+      structuralIssues(result.issues, 'CLAUDE.md')
+        .map((i) => i.category)
+        .sort(),
+    ).toEqual(['final-reporting', 'safety-boundaries', 'validation-commands'])
+  })
+
+  it('evaluates a Cursor rules directory as one set', async () => {
+    await write('.cursor/rules/safety.mdc', 'Ask before changing auth.')
+    await write('.cursor/rules/testing.mdc', 'Run pnpm test.')
+    await write('.cursor/rules/report.mdc', '## Final report\nFiles changed, commands run.')
+    const result = await auditRepo(tmpDir)
+    const structural = result.issues.filter((i) =>
+      ['safety-boundaries', 'validation-commands', 'final-reporting'].includes(i.category),
+    )
+    expect(structural).toEqual([])
+  })
+
+  it('skips structural checks for nested AGENTS.md but keeps content checks', async () => {
+    await write('AGENTS.md', fullGuidance)
+    await write('packages/web/AGENTS.md', 'In this package you can skip tests.')
+    const result = await auditRepo(tmpDir)
+    const nested = result.issues.filter((i) => i.file === path.join('packages', 'web', 'AGENTS.md'))
+    expect(nested.map((i) => i.category)).toEqual(['risky-language'])
+  })
+})

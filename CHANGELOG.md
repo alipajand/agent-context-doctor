@@ -10,6 +10,8 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Added
 
+- Detection for GEMINI.md, AGENT.md, Windsurf, Cline, Roo Code, Kiro, Junie, Augment, Continue, and Goose instruction files; Claude subagents, skills, and nested commands; Copilot prompt, chat mode, and agent files; nested Cursor rules; and nested `AGENTS.md`/`CLAUDE.md`/`GEMINI.md` in monorepo packages. New `ContextFileKind` values: `gemini`, `windsurf`, `cline`, `roo`, `kiro`, `junie`, `augment`, `continue`, `goose`.
+- `vendor/`, test fixture directories, virtualenvs, `target/`, `.next/`, and `.turbo/` are skipped during discovery.
 - `hidden-characters` check: flags invisible Unicode in instruction files — tag characters (high, with the hidden text decoded), bidirectional controls (high), and zero-width characters (medium). Legitimate ZWJ in emoji and ZWNJ in scripts such as Persian are not flagged.
 - `secrets` check: flags AWS, GitHub, Anthropic, OpenAI, Stripe, Slack, and npm tokens, private keys (high), and credential-looking assignments (medium). Evidence is redacted and obvious placeholders are ignored.
 - `risky-language` now also flags `--no-verify`, force pushes, skipped agent permission prompts, disabled TLS verification, deleting failing tests (high), and pushing directly to main, merging without review, `curl | sh`, `chmod 777`, and suppressing type or lint errors (medium).
@@ -42,6 +44,7 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Fixed
 
+- The structural checks (safety boundaries, validation commands, final reporting) flagged every primary file on its own. A `CLAUDE.md` that just says "Follow AGENTS.md" lost up to 19 points, and each file in a `.cursor/rules/` set had to repeat every section. Guidance now counts when it appears in the file, in a context file it references, or in another primary file for the same tool. Nested `AGENTS.md` files get content checks only.
 - `risky-language` and `contradictions` treated safety guidance such as "Never skip tests" or "You should never bypass auth" as the risky instruction it forbids. Only "not" directly before the phrase was recognized as negation; the check now looks for negation anywhere earlier in the same clause.
 - `command-alignment` no longer treats `Object.prototype` members such as `constructor` as existing scripts, and ignores malformed `scripts` fields instead of crashing.
 
