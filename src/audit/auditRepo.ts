@@ -19,6 +19,7 @@ import { fingerprintIssue } from './baseline.js'
 import { checkBrokenReferences, extractFileReferences } from './checks/brokenReferences.js'
 import { checkFileSize, DEFAULT_MAX_FILE_BYTES } from './checks/fileSize.js'
 import { AGENT_CONFIG_FILES, checkAgentConfig } from './checks/agentConfig.js'
+import { checkFrontmatter } from './checks/frontmatter.js'
 import { isWithin } from '../fs/safePath.js'
 import fs from 'node:fs/promises'
 import { computeScore } from './score.js'
@@ -179,6 +180,10 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
 
     if (!disabled.has('secrets')) {
       fileIssues.push(...checkSecrets(filePath, content))
+    }
+
+    if (!disabled.has('frontmatter')) {
+      fileIssues.push(...checkFrontmatter(filePath, content))
     }
 
     if (!disabled.has('placeholder-content')) {

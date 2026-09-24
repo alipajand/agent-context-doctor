@@ -76,6 +76,13 @@ export const CHECKS: readonly CheckInfo[] = [
     description: 'Directives that contradict each other, such as always/never run tests',
   },
   {
+    id: 'frontmatter',
+    severity: 'medium/low',
+    appliesTo: 'tool rule files',
+    description:
+      'Cursor rules, Claude subagents/skills, and Copilot instructions whose frontmatter keeps them from loading',
+  },
+  {
     id: 'agent-config',
     severity: 'high/medium/low',
     appliesTo: 'agent config files',

@@ -13,6 +13,7 @@ export const VALID_CHECKS = [
   'broken-references',
   'file-size',
   'agent-config',
+  'frontmatter',
 ] as const
 
 export const OUTPUT_FORMATS = ['terminal', 'json', 'markdown', 'sarif', 'github'] as const

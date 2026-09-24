@@ -165,3 +165,4 @@ A JSON file at the root of the audited repository. All fields are optional.
 - `broken-references`
 - `file-size`
 - `agent-config`
+- `frontmatter`

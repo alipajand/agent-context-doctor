@@ -55,6 +55,7 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkBrokenReferences` | `brokenReferences.ts` | Links, inline-code paths, and `@imports` to files that do not exist (existence is resolved in `auditRepo`, never outside the repo) |
 | `checkFileSize` | `fileSize.ts` | Primary instruction files over the size budget |
 | `checkMakeTargets` | `commandAlignment.ts` | `make` targets referenced in instructions but missing from the Makefile |
+| `checkFrontmatter` | `frontmatter.ts` | Cursor rules, Claude subagents/skills, and Copilot instructions whose frontmatter keeps them from loading |
 | `checkAgentConfig` | `agentConfig.ts` | Claude Code permissions and MCP server configs: bypass mode, unrestricted shell, unpinned packages, plain HTTP, hardcoded credentials |
 | `checkSkippedFile` | `skippedFiles.ts` | Context files that were detected but not read: links outside the repo, broken links, or files over 1 MiB |
 

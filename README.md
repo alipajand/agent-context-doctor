@@ -29,6 +29,7 @@ AI coding agents follow whatever their instruction files tell them. A file full 
 | **Command alignment** | `pnpm`/`npm`/`yarn`/`bun` scripts and `make` targets referenced in instructions that don't exist. Built-in commands, workspace-targeted runs (`--filter`, `-C`, `workspace`), and prose ("use pnpm for everything") are ignored |
 | **Broken references** | Markdown links, inline-code paths (`docs/ARCHITECTURE.md`), and `@imports` that point at files that no longer exist |
 | **Contradictions** | Conflicting directives across two or more files |
+| **Frontmatter** | Tool rule files that are silently ignored: Cursor `.mdc` rules with no `alwaysApply: true`, `globs`, or `description` (or no frontmatter), Claude subagents and skills without `name` and `description`, Copilot `.instructions.md` without `applyTo`, and unclosed frontmatter |
 | **Agent config** | Committed agent settings: Claude Code `bypassPermissions`, unrestricted `Bash` permissions, auto-trusted MCP servers, and MCP servers in `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, or `.roo/mcp.json` that run unpinned packages (`npx pkg` without a version), connect over plain HTTP, or hardcode credentials |
 | **File access** | Context files that are broken symlinks, or symlinks pointing outside the audited directory (never read) |
 | **File size** | Primary instruction files over a budget (40 KB by default, `rules.maxFileBytes`), and context files over 1 MiB, which are reported instead of read |
@@ -230,7 +231,7 @@ Add an optional `.acdrc` file at the repo root to set defaults without changing 
 | Key | Type | Description |
 |-----|------|-------------|
 | `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. |
-| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`, `broken-references`, `file-size`, `agent-config`. Unknown values fail validation. Run `acd checks` to list them with descriptions. |
+| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`, `broken-references`, `file-size`, `agent-config`, `frontmatter`. Unknown values fail validation. Run `acd checks` to list them with descriptions. |
 | `allowedMissingScripts` | `string[]` | Script names allowed to be absent from `package.json` without raising a `command-alignment` issue. |
 | `maxFileBytes` | `number` | Size budget for primary instruction files (default `40000`). Larger files get a low `file-size` issue. |
 
@@ -255,7 +256,7 @@ You may skip tests only in the emergency hotfix workflow.
 <!-- acd-disable-file placeholder-content -->
 ```
 
-Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`, `hidden-characters`, `secrets`, `broken-references`, `file-size`.
+Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`, `hidden-characters`, `secrets`, `broken-references`, `file-size`, `frontmatter`.
 
 Contradiction issues span two or more files, so a file-level suppression in **all** involved files is required to silence them:
 
