@@ -3,6 +3,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import {
+  checkMakeTargets,
+  extractMakeTargets,
+  parseMakeTargets,
   extractCommands,
   checkCommandAlignment,
   checkCommandsWithoutPackageJson,
@@ -244,5 +247,86 @@ describe('auditRepo command alignment integration', () => {
       (i) => i.category === 'command-alignment' && i.severity === 'low',
     )
     expect(issue).toBeDefined()
+  })
+})
+
+describe('extractCommands accuracy', () => {
+  const scripts = (content: string) => extractCommands(content).map((c) => c.script)
+
+  it.each([
+    'Use pnpm for everything.',
+    'We use pnpm instead of npm.',
+    'pnpm is the package manager here.',
+  ])('ignores prose: %s', (line) => {
+    expect(scripts(line)).toEqual([])
+  })
+
+  it.each([
+    'Run `pnpm exec tsc --noEmit`.',
+    'Run `pnpm dlx prettier --check .`.',
+    'Run `yarn dlx eslint .`.',
+    'Run `bun test` and `bun build ./src/index.ts`.',
+    'Run `pnpm deploy --filter api out/`.',
+  ])('ignores package-manager built-ins: %s', (line) => {
+    expect(scripts(line)).toEqual([])
+  })
+
+  it.each([
+    'Run `pnpm -C packages/web test`.',
+    'Run `pnpm --filter web build`.',
+    'Run `pnpm --filter=web build`.',
+    'Run `pnpm -r lint`.',
+    'Run `yarn workspace web build`.',
+    'Run `npm run build --workspace=web`.',
+  ])('skips scripts that live in another workspace package: %s', (line) => {
+    expect(scripts(line)).toEqual([])
+  })
+
+  it('still checks root scripts after flags that do not change the package', () => {
+    expect(scripts('Run `pnpm --silent lint`.')).toEqual(['lint'])
+  })
+
+  it('checks prose-like words inside code blocks', () => {
+    expect(scripts('```bash\npnpm check\n```')).toEqual(['check'])
+  })
+})
+
+describe('make targets', () => {
+  it('extracts targets from code and inline code only', () => {
+    const content = [
+      'Make sure the build passes.',
+      'Run `make lint` before pushing.',
+      '```sh',
+      'make -j4 test',
+      'make -C docs html',
+      'make VERBOSE=1',
+      '```',
+    ].join('\n')
+    expect(extractMakeTargets(content).map((t) => [t.script, t.line])).toEqual([
+      ['lint', 2],
+      ['test', 4],
+    ])
+  })
+
+  it('parses Makefile targets and ignores special targets and assignments', () => {
+    const makefile = [
+      '.PHONY: build test',
+      'VERSION := 1.0',
+      'CC = gcc',
+      'build: deps',
+      '\tgo build ./...',
+      'test lint:',
+      '\tgo test ./...',
+    ].join('\n')
+    expect([...parseMakeTargets(makefile)].sort()).toEqual(['build', 'lint', 'test'])
+  })
+
+  it('flags missing targets and a missing Makefile', () => {
+    const content = 'Run `make ship`.'
+    expect(checkMakeTargets('AGENTS.md', content, new Set(['build']))[0].message).toContain(
+      'missing make target: "ship"',
+    )
+    expect(checkMakeTargets('AGENTS.md', content, null)[0].message).toContain('no Makefile')
+    expect(checkMakeTargets('AGENTS.md', content, new Set(['ship']))).toEqual([])
   })
 })

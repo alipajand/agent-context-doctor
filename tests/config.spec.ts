@@ -205,7 +205,7 @@ describe('allowedMissingScripts', () => {
   it('only suppresses the listed scripts, not others', async () => {
     await fs.writeFile(
       path.join(tmpDir, 'AGENTS.md'),
-      'Run pnpm validate and pnpm deploy.\nAsk before auth changes.\nFinal report: files changed.',
+      'Run pnpm validate and pnpm release.\nAsk before auth changes.\nFinal report: files changed.',
     )
     await fs.writeFile(
       path.join(tmpDir, 'package.json'),
@@ -214,6 +214,6 @@ describe('allowedMissingScripts', () => {
 
     const result = await auditRepo(tmpDir, { allowedMissingScripts: ['validate'] })
     expect(result.issues.some((i) => i.message.includes('validate'))).toBe(false)
-    expect(result.issues.some((i) => i.message.includes('deploy'))).toBe(true)
+    expect(result.issues.some((i) => i.message.includes('release'))).toBe(true)
   })
 })
