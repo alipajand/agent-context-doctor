@@ -175,10 +175,16 @@ function mcpServerFindings(name: string, server: Record<string, unknown>): Findi
   return findings
 }
 
+// The quoted JSON form finds the value itself: a bare "~" would also match
+// "Edit(~/.zshrc)" on an earlier line.
 function lineOf(content: string, needle: string | undefined): number | undefined {
   if (!needle) return undefined
-  const idx = content.split('\n').findIndex((line) => line.includes(needle))
-  return idx === -1 ? undefined : idx + 1
+  const lines = content.split('\n')
+  for (const form of [JSON.stringify(needle), needle]) {
+    const idx = lines.findIndex((line) => line.includes(form))
+    if (idx !== -1) return idx + 1
+  }
+  return undefined
 }
 
 /**
