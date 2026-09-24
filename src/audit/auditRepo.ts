@@ -18,6 +18,7 @@ import { checkSecrets } from './checks/secrets.js'
 import { fingerprintIssue } from './baseline.js'
 import { checkBrokenReferences, extractFileReferences } from './checks/brokenReferences.js'
 import { checkFileSize, DEFAULT_MAX_FILE_BYTES } from './checks/fileSize.js'
+import { AGENT_CONFIG_FILES, checkAgentConfig } from './checks/agentConfig.js'
 import { isWithin } from '../fs/safePath.js'
 import fs from 'node:fs/promises'
 import { computeScore } from './score.js'
@@ -77,6 +78,17 @@ async function findMissingReferences(
     if (!found) missing.add(target)
   }
   return missing
+}
+
+/**
+ * Read a file by its repo-relative path, or '' when it is missing or resolves
+ * outside the repository (a symlink), so its contents never reach evidence.
+ */
+async function readRepoFile(repoPath: string, rel: string): Promise<string> {
+  const realRepo = await fs.realpath(repoPath).catch(() => repoPath)
+  const realFile = await fs.realpath(path.join(repoPath, rel)).catch(() => null)
+  if (realFile === null || !isWithin(realRepo, realFile)) return ''
+  return readTextFile(realFile)
 }
 
 async function readMakeTargets(repoPath: string): Promise<Set<string> | null> {
@@ -214,6 +226,15 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
     }
 
     issues.push(...filterSuppressedIssues(filePath, content, fileIssues))
+  }
+
+  // Agent configuration (permissions, MCP servers) lives in JSON files that
+  // are not instruction text, so it is read separately from context files.
+  if (!disabled.has('agent-config')) {
+    for (const rel of AGENT_CONFIG_FILES) {
+      const content = await readRepoFile(absoluteRepo, rel)
+      if (content !== '') issues.push(...checkAgentConfig(path.normalize(rel), content))
+    }
   }
 
   // Cross-file contradiction check runs after all files are collected

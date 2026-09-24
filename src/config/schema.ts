@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const VALID_CHECKS = [
+export const VALID_CHECKS = [
   'placeholder-content',
   'safety-boundaries',
   'validation-commands',
@@ -12,6 +12,7 @@ const VALID_CHECKS = [
   'secrets',
   'broken-references',
   'file-size',
+  'agent-config',
 ] as const
 
 export const OUTPUT_FORMATS = ['terminal', 'json', 'markdown', 'sarif', 'github'] as const
