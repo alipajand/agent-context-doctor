@@ -11,6 +11,8 @@ import {
 } from './checks/commandAlignment.js'
 import { checkContradictions } from './checks/contradictions.js'
 import { checkSkippedFile } from './checks/skippedFiles.js'
+import { checkHiddenCharacters } from './checks/hiddenCharacters.js'
+import { checkSecrets } from './checks/secrets.js'
 import { computeScore } from './score.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
@@ -63,6 +65,14 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
     fileContents.push({ path: ctxFile.path, content })
 
     const fileIssues: ContextIssue[] = []
+
+    if (!disabled.has('hidden-characters')) {
+      fileIssues.push(...checkHiddenCharacters(ctxFile.path, content))
+    }
+
+    if (!disabled.has('secrets')) {
+      fileIssues.push(...checkSecrets(ctxFile.path, content))
+    }
 
     if (!disabled.has('placeholder-content')) {
       fileIssues.push(...checkPlaceholderContent(ctxFile.path, content))

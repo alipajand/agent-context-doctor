@@ -223,3 +223,21 @@ describe('auditRepo contradiction integration', () => {
     expect(contraIssues).toHaveLength(0)
   })
 })
+
+describe('checkContradictions negation', () => {
+  it('does not treat "never skip tests" as contradicting "always run tests"', () => {
+    const issues = checkContradictions([
+      { path: 'AGENTS.md', content: 'Always run tests before finishing.' },
+      { path: 'CLAUDE.md', content: 'Never skip tests.' },
+    ])
+    expect(issues).toEqual([])
+  })
+
+  it('still reports a permissive opposing phrase on a later line', () => {
+    const issues = checkContradictions([
+      { path: 'AGENTS.md', content: 'Always run tests before finishing.' },
+      { path: 'CLAUDE.md', content: 'Never skip tests in CI.\nLocally you can skip tests.' },
+    ])
+    expect(issues.map((i) => i.id)).toContain('contradiction-tests')
+  })
+})

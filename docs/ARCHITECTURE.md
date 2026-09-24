@@ -16,6 +16,7 @@ The tool has no runtime server, no database, no network dependencies, and no LLM
 | `src/audit/checks/*` | Individual static checks — one pure function per check |
 | `src/audit/score.ts` | Deduction-based scoring: starts at 100, subtracts per severity |
 | `src/audit/evidence.ts` | Extracts line-level evidence snippets for check findings |
+| `src/audit/negation.ts` | Detects negated directives ("Never skip tests") so safety guidance is not reported as risky |
 | `src/audit/suppressions.ts` | Parses `acd-disable` inline comments; filters suppressed issues |
 | `src/config/loadConfig.ts` | Loads and validates `.acdrc` via Zod |
 | `src/config/schema.ts` | Zod schema for `.acdrc` (audit options, rule overrides) |
@@ -46,6 +47,8 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkValidationCommands` | `validationCommands.ts` | Primary files that don't mention test/lint/typecheck/build |
 | `checkFinalReporting` | `finalReporting.ts` | Primary files without final-report guidance (files changed, commands run, etc.) |
 | `checkContradictions` | `contradictions.ts` | Cross-file directives that contradict each other (always run tests vs. skip tests) |
+| `checkHiddenCharacters` | `hiddenCharacters.ts` | Invisible Unicode (tag characters, bidi controls, zero-width characters) that can hide instructions; decodes tag-character text |
+| `checkSecrets` | `secrets.ts` | Credentials pasted into instruction files; evidence is redacted |
 | `checkSkippedFile` | `skippedFiles.ts` | Context files that were detected but not read: links outside the repo, broken links, or files over 1 MiB |
 
 ## Scoring model

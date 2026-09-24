@@ -143,3 +143,5 @@ A JSON file at the root of the audited repository. All fields are optional.
 - `validation-commands`
 - `final-reporting`
 - `contradictions`
+- `hidden-characters`
+- `secrets`

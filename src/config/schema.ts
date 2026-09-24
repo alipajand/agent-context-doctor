@@ -8,6 +8,8 @@ const VALID_CHECKS = [
   'risky-language',
   'command-alignment',
   'contradictions',
+  'hidden-characters',
+  'secrets',
 ] as const
 
 export const AcdRcSchema = z.object({

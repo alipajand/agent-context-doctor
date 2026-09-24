@@ -20,7 +20,9 @@ AI coding agents follow whatever their instruction files tell them. A file full 
 |-------|-----------|
 | **Presence** | Whether any agent context file exists at all |
 | **Placeholder content** | Unfilled markers like `TODO`, `TBD`, `lorem ipsum`, or blank scope sections |
-| **Risky language** | Directives like "skip tests", "bypass auth", or "commit secrets" |
+| **Risky language** | Directives like "skip tests", "bypass auth", "commit with --no-verify", "force push", or piping `curl` into a shell. Negated guidance such as "Never skip tests" is not flagged |
+| **Hidden characters** | Invisible Unicode that can smuggle instructions past reviewers: tag characters (decoded in the report), bidi overrides, zero-width characters |
+| **Secrets** | Credentials pasted into instruction files (AWS, GitHub, Anthropic, OpenAI, Stripe, Slack, npm, private keys, credential assignments); evidence is redacted |
 | **Safety boundaries** | Whether primary files include ask-before / forbidden-change language for auth, billing, database, and production |
 | **Validation commands** | Whether instructions tell agents to run tests, lint, or typecheck |
 | **Final reporting** | Whether instructions describe what to include in a final summary |
@@ -224,7 +226,7 @@ Add an optional `.acdrc` file at the repo root to set defaults without changing 
 | Key | Type | Description |
 |-----|------|-------------|
 | `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. |
-| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`. Unknown values fail validation. |
+| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`. Unknown values fail validation. |
 | `allowedMissingScripts` | `string[]` | Script names allowed to be absent from `package.json` without raising a `command-alignment` issue. |
 
 Precedence is `CLI flags > .acdrc > defaults`. Config is loaded from the resolved repo path (or `cwd` if no path is given).
@@ -248,7 +250,7 @@ You may skip tests only in the emergency hotfix workflow.
 <!-- acd-disable-file placeholder-content -->
 ```
 
-Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`.
+Valid categories: `risky-language`, `placeholder-content`, `command-alignment`, `contradictions`, `safety-boundaries`, `validation-commands`, `final-reporting`, `hidden-characters`, `secrets`.
 
 Contradiction issues span two or more files, so a file-level suppression in **all** involved files is required to silence them:
 
