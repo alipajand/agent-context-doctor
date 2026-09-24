@@ -117,6 +117,16 @@ acd init --force
 
 ---
 
+## `acd checks`
+
+List every check with its severity, the files it applies to, and a one-line description. The IDs are the values accepted by `rules.disabledChecks`.
+
+| Flag | Description |
+| --- | --- |
+| `--json` | Print the catalog as JSON |
+
+---
+
 ## `.acdrc` Configuration File
 
 A JSON file at the root of the audited repository. All fields are optional.
@@ -154,3 +164,4 @@ A JSON file at the root of the audited repository. All fields are optional.
 - `secrets`
 - `broken-references`
 - `file-size`
+- `agent-config`

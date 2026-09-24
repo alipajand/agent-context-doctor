@@ -4,6 +4,12 @@ This document describes the public contracts for each module in `src/`. Import p
 
 ---
 
+## Package entry point (`src/index.ts`)
+
+`import … from 'agent-context-doctor'` exposes `auditRepo`, `detectContextFiles`, `isPrimaryInstructionFile`, `loadConfig`, `toJsonReport`, `toMarkdownReport`, `toSarifReport`, `toGithubAnnotations`, `loadBaseline`, `applyBaseline`, `fingerprintIssue`, `BaselineError`, `CHECKS`, `VERSION`, and the types below.
+
+---
+
 ## `src/types.ts`
 
 Core shared types. Import from `'./types.js'`.

@@ -10,6 +10,9 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Added
 
+- `agent-config` check for committed agent settings. Claude Code: `bypassPermissions` and unrestricted `Bash` allow rules (high), `enableAllProjectMcpServers` (medium). MCP configs (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, `.roo/mcp.json`): hardcoded credentials in `env`/headers (high, redacted), `npx`/`uvx` packages without a pinned version and plain-HTTP remote servers (medium). JSONC is supported, and config files that resolve outside the repository are not read.
+- `acd checks` lists every check ID with its severity and description (`--json` for machine output).
+- Library entry point: `import { auditRepo } from 'agent-context-doctor'` (`main`, `types`, and `exports` in `package.json`).
 - `broken-references` check: Markdown links, inline-code paths, and Claude `@imports` that point at files that no longer exist. Targets are only probed inside the repository; `.js` references match their `.ts` sources.
 - `file-size` budget: primary instruction files over 40 KB (configurable with `rules.maxFileBytes`) get a low issue, since agents load them into every session.
 - `command-alignment` also checks `make <target>` references against the Makefile.

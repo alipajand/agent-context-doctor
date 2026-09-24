@@ -29,6 +29,7 @@ AI coding agents follow whatever their instruction files tell them. A file full 
 | **Command alignment** | `pnpm`/`npm`/`yarn`/`bun` scripts and `make` targets referenced in instructions that don't exist. Built-in commands, workspace-targeted runs (`--filter`, `-C`, `workspace`), and prose ("use pnpm for everything") are ignored |
 | **Broken references** | Markdown links, inline-code paths (`docs/ARCHITECTURE.md`), and `@imports` that point at files that no longer exist |
 | **Contradictions** | Conflicting directives across two or more files |
+| **Agent config** | Committed agent settings: Claude Code `bypassPermissions`, unrestricted `Bash` permissions, auto-trusted MCP servers, and MCP servers in `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, or `.roo/mcp.json` that run unpinned packages (`npx pkg` without a version), connect over plain HTTP, or hardcode credentials |
 | **File access** | Context files that are broken symlinks, or symlinks pointing outside the audited directory (never read) |
 | **File size** | Primary instruction files over a budget (40 KB by default, `rules.maxFileBytes`), and context files over 1 MiB, which are reported instead of read |
 
@@ -98,6 +99,7 @@ acd audit --min-score 80                   # exit non-zero when the score is bel
 acd audit --format github                  # GitHub Actions annotations (also: json, markdown, sarif)
 acd audit --baseline .acd-baseline.json    # only issues missing from the baseline trigger --fail-on
 acd list                                   # list detected context files only
+acd checks                                 # list every check and its ID
 ```
 
 ### Auditing a repo with Claude files
@@ -228,7 +230,7 @@ Add an optional `.acdrc` file at the repo root to set defaults without changing 
 | Key | Type | Description |
 |-----|------|-------------|
 | `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. |
-| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`, `broken-references`, `file-size`. Unknown values fail validation. |
+| `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`, `broken-references`, `file-size`, `agent-config`. Unknown values fail validation. Run `acd checks` to list them with descriptions. |
 | `allowedMissingScripts` | `string[]` | Script names allowed to be absent from `package.json` without raising a `command-alignment` issue. |
 | `maxFileBytes` | `number` | Size budget for primary instruction files (default `40000`). Larger files get a low `file-size` issue. |
 
@@ -338,6 +340,19 @@ Issues are matched by category, file, message, and evidence rather than line num
 - Only text files matching the known patterns above are read. Binary and generated files are skipped.
 - Symlinked directories are not followed, so instruction files that live behind a directory symlink are not detected. Link the files themselves instead.
 - It checks how instructions are *written*, not whether an agent will follow them or whether the resulting code is correct. Human review still matters.
+
+## Library use
+
+`acd` can also be imported:
+
+```ts
+import { auditRepo, toSarifReport } from 'agent-context-doctor'
+
+const result = await auditRepo('/path/to/repo', { disabledChecks: ['file-size'] })
+console.log(result.score.total, result.issues.length)
+```
+
+Exports include `auditRepo`, `detectContextFiles`, `loadConfig`, the JSON/Markdown/SARIF/GitHub report functions, baseline helpers, the `CHECKS` catalog, and all result types.
 
 ## Related tools
 

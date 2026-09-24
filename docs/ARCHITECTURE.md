@@ -10,7 +10,10 @@ The tool has no runtime server, no database, no network dependencies, and no LLM
 
 | Path | Role |
 | --- | --- |
-| `src/cli.ts` | Commander entrypoint; routes `audit`, `list`, and `init` subcommands |
+| `src/cli.ts` | Commander entrypoint; routes `audit`, `list`, `init`, and `checks` subcommands |
+| `src/index.ts` | Library entry point (`exports` in `package.json`) |
+| `src/audit/checkCatalog.ts` | Descriptions of every check, used by `acd checks` |
+| `src/audit/baseline.ts` | Issue fingerprints and `--baseline` matching |
 | `src/audit/auditRepo.ts` | Orchestrates all checks, applies suppressions, computes the final score |
 | `src/audit/detectContextFiles.ts` | Discovers and classifies agent context files in a repo |
 | `src/audit/checks/*` | Individual static checks — one pure function per check |
@@ -52,6 +55,7 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkBrokenReferences` | `brokenReferences.ts` | Links, inline-code paths, and `@imports` to files that do not exist (existence is resolved in `auditRepo`, never outside the repo) |
 | `checkFileSize` | `fileSize.ts` | Primary instruction files over the size budget |
 | `checkMakeTargets` | `commandAlignment.ts` | `make` targets referenced in instructions but missing from the Makefile |
+| `checkAgentConfig` | `agentConfig.ts` | Claude Code permissions and MCP server configs: bypass mode, unrestricted shell, unpinned packages, plain HTTP, hardcoded credentials |
 | `checkSkippedFile` | `skippedFiles.ts` | Context files that were detected but not read: links outside the repo, broken links, or files over 1 MiB |
 
 ## Scoring model

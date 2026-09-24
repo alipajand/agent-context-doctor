@@ -309,6 +309,21 @@ describe('acd audit formats and gates', () => {
   })
 })
 
+describe('acd checks', () => {
+  it('lists check IDs', () => {
+    const result = runCli(['checks'])
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('hidden-characters')
+    expect(result.stdout).toContain('agent-config')
+  })
+
+  it('prints the catalog as JSON', () => {
+    const result = runCli(['checks', '--json'])
+    const checks = JSON.parse(result.stdout) as Array<{ id: string }>
+    expect(checks.map((c) => c.id)).toContain('secrets')
+  })
+})
+
 describe('acd list', () => {
   it('lists detected context files', () => {
     const result = runCli(['list', path.resolve('examples/good-context')])
