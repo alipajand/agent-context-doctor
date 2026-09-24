@@ -13,6 +13,7 @@ import { checkContradictions } from './checks/contradictions.js'
 import { checkSkippedFile } from './checks/skippedFiles.js'
 import { checkHiddenCharacters } from './checks/hiddenCharacters.js'
 import { checkSecrets } from './checks/secrets.js'
+import { fingerprintIssue } from './baseline.js'
 import { computeScore } from './score.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
@@ -185,6 +186,10 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
   const high = issues.filter((i) => i.severity === 'high').length
   const medium = issues.filter((i) => i.severity === 'medium').length
   const low = issues.filter((i) => i.severity === 'low').length
+
+  for (const issue of issues) {
+    issue.fingerprint = fingerprintIssue(issue)
+  }
 
   return {
     repoPath: absoluteRepo,

@@ -11,6 +11,10 @@ export type ContextIssue = {
   endLine?: number
   evidence?: string
   files?: string[]
+  /** Stable identity used for baselines and SARIF; ignores line numbers. */
+  fingerprint?: string
+  /** Set when `--baseline` already recorded this issue. */
+  inBaseline?: boolean
 }
 
 export type ContextFileKind =
@@ -66,4 +70,10 @@ export type AuditResult = {
   }
   score: AuditScore
   issues: ContextIssue[]
+  /** Present when the audit ran with `--baseline`. */
+  baseline?: {
+    path: string
+    known: number
+    new: number
+  }
 }

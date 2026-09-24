@@ -213,6 +213,102 @@ describe('acd audit output confinement', () => {
   })
 })
 
+describe('acd audit formats and gates', () => {
+  const risky =
+    '# Agents\nRun pnpm test. Ask before auth changes.\n## Final report\nFiles changed.\nSkip tests if slow.'
+
+  it('prints SARIF with --format sarif', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), risky)
+    const result = runCli(['audit', tmpDir, '--format', 'sarif'])
+    const sarif = JSON.parse(result.stdout) as { version: string; runs: unknown[] }
+    expect(sarif.version).toBe('2.1.0')
+    expect(result.stderr).not.toContain('Auditing')
+  })
+
+  it('prints workflow annotations with --format github', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), risky)
+    const result = runCli(['audit', tmpDir, '--format', 'github'])
+    expect(result.stdout).toMatch(/^::error /m)
+    expect(result.stdout).toContain('acd: score')
+  })
+
+  it('prints Markdown with --format markdown', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), risky)
+    const result = runCli(['audit', tmpDir, '--format', 'markdown'])
+    expect(result.stdout).toContain('# Agent Context Doctor Report')
+  })
+
+  it('rejects an unknown format before auditing', () => {
+    const result = runCli(['audit', tmpDir, '--format', 'xml'])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Invalid format')
+  })
+
+  it('fails when the score is below --min-score', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), risky)
+    const failing = runCli(['audit', tmpDir, '--min-score', '95'])
+    expect(failing.status).toBe(1)
+    expect(failing.stderr).toContain('below --min-score 95')
+    expect(runCli(['audit', tmpDir, '--min-score', '10']).status).toBe(0)
+  })
+
+  it('rejects an invalid --min-score', () => {
+    const result = runCli(['audit', tmpDir, '--min-score', '120'])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Invalid min-score')
+  })
+
+  it('reads minScore and format from .acdrc', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), risky)
+    await fs.writeFile(
+      path.join(tmpDir, '.acdrc'),
+      JSON.stringify({ audit: { minScore: 95, format: 'github' } }),
+    )
+    const result = runCli(['audit', tmpDir])
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('acd: score')
+  })
+
+  it('only fails on issues that are not in the baseline', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), risky)
+    const baselineFile = path.join(tmpDir, 'baseline.json')
+    await fs.writeFile(baselineFile, runCli(['audit', tmpDir, '--json']).stdout)
+
+    const unchanged = runCli(['audit', tmpDir, '--baseline', baselineFile, '--fail-on', 'high'])
+    expect(unchanged.status).toBe(0)
+    expect(unchanged.stdout).toContain('(known)')
+
+    await fs.appendFile(path.join(tmpDir, 'AGENTS.md'), '\nBypass auth for admins.')
+    const regressed = runCli(['audit', tmpDir, '--baseline', baselineFile, '--fail-on', 'high'])
+    expect(regressed.status).toBe(1)
+  })
+
+  it('keeps baseline matches when lines move', async () => {
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), risky)
+    const baselineFile = path.join(tmpDir, 'baseline.json')
+    await fs.writeFile(baselineFile, runCli(['audit', tmpDir, '--json']).stdout)
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), `# Intro\n\n${risky}`)
+    const result = runCli(['audit', tmpDir, '--baseline', baselineFile, '--fail-on', 'high'])
+    expect(result.status).toBe(0)
+  })
+
+  it('reports an unreadable baseline', () => {
+    const result = runCli(['audit', tmpDir, '--baseline', path.join(tmpDir, 'missing.json')])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Baseline error')
+  })
+
+  it('keeps an .acdrc baseline inside the repository', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, '.acdrc'),
+      JSON.stringify({ audit: { baseline: '../b.json' } }),
+    )
+    const result = runCli(['audit', tmpDir])
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('audit.baseline must stay inside')
+  })
+})
+
 describe('acd list', () => {
   it('lists detected context files', () => {
     const result = runCli(['list', path.resolve('examples/good-context')])

@@ -57,6 +57,10 @@ export function toMarkdownReport(result: AuditResult): string {
   lines.push(`| High | ${summary.high} |`)
   lines.push(`| Medium | ${summary.medium} |`)
   lines.push(`| Low | ${summary.low} |`)
+  if (result.baseline) {
+    lines.push(`| New since baseline | ${result.baseline.new} |`)
+    lines.push(`| Known (baseline) | ${result.baseline.known} |`)
+  }
   lines.push('')
 
   lines.push('## Context Files')

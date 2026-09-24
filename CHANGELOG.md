@@ -10,6 +10,9 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Added
 
+- `--format terminal|json|markdown|sarif|github` (and `audit.format` in `.acdrc`). SARIF 2.1.0 uploads to GitHub code scanning; `github` prints workflow annotations that appear inline on pull requests. `--json` still works.
+- `--min-score <n>` (and `audit.minScore`) to fail when the score drops below a threshold.
+- `--baseline <file>` (and `audit.baseline`): issues already listed in an earlier `acd audit --json` report are marked known and do not trigger `--fail-on`, so existing repositories can adopt `acd` without fixing everything first. Issues carry a line-independent `fingerprint`.
 - Detection for GEMINI.md, AGENT.md, Windsurf, Cline, Roo Code, Kiro, Junie, Augment, Continue, and Goose instruction files; Claude subagents, skills, and nested commands; Copilot prompt, chat mode, and agent files; nested Cursor rules; and nested `AGENTS.md`/`CLAUDE.md`/`GEMINI.md` in monorepo packages. New `ContextFileKind` values: `gemini`, `windsurf`, `cline`, `roo`, `kiro`, `junie`, `augment`, `continue`, `goose`.
 - `vendor/`, test fixture directories, virtualenvs, `target/`, `.next/`, and `.turbo/` are skipped during discovery.
 - `hidden-characters` check: flags invisible Unicode in instruction files — tag characters (high, with the hidden text decoded), bidirectional controls (high), and zero-width characters (medium). Legitimate ZWJ in emoji and ZWNJ in scripts such as Persian are not flagged.

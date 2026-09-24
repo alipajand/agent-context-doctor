@@ -30,6 +30,8 @@ type ContextIssue = {
   endLine?: number
   evidence?: string    // Snippet of offending content
   files?: string[]     // For cross-file issues (contradictions)
+  fingerprint?: string // Stable identity (category, file, message, evidence); ignores line numbers
+  inBaseline?: boolean // Set when --baseline already lists this issue
 }
 ```
 

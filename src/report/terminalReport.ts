@@ -45,6 +45,11 @@ export function printTerminalReport(result: AuditResult): void {
   console.log(
     `${pc.bold('Score:')}   ${gradeColor(score.grade, `${score.total} / ${score.max}`)} — ${gradeColor(score.grade, score.grade)}`,
   )
+  if (result.baseline) {
+    console.log(
+      `${pc.bold('Baseline:')} ${result.baseline.new} new, ${pc.dim(`${result.baseline.known} known`)}`,
+    )
+  }
 
   if (files.length > 0) {
     console.log()
@@ -64,7 +69,10 @@ export function printTerminalReport(result: AuditResult): void {
       const fileRef = toDisplayText(
         issue.file !== result.repoPath ? `${issue.file}${loc}` : issue.file,
       )
-      console.log(`  ${severityColor(issue.severity)} ${fileRef} — ${toDisplayText(issue.message)}`)
+      const known = issue.inBaseline ? ` ${pc.dim('(known)')}` : ''
+      console.log(
+        `  ${severityColor(issue.severity)} ${fileRef} — ${toDisplayText(issue.message)}${known}`,
+      )
       console.log(`    ${pc.dim('Recommendation:')} ${toDisplayText(issue.recommendation)}`)
       if (issue.evidence) {
         console.log(`    ${pc.dim('Evidence:')} ${toDisplayText(issue.evidence)}`)
