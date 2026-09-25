@@ -1,10 +1,10 @@
 # agent-context-doctor
 
-`agent-context-doctor` checks whether your agent instruction files are specific, safe, and usable. It catches placeholder content, risky language, contradictions, stale commands, and missing validation guidance before those instructions guide an AI coding agent.
+`agent-context-doctor` checks whether your agent instruction files and agent settings are specific, safe, and usable. It catches placeholder content, risky language, contradictions, stale commands, missing validation guidance, pasted secrets, hidden Unicode, and risky Claude Code and MCP configuration before they steer an AI coding agent.
 
 ## What it is
 
-A small, deterministic CLI (`acd`) that reads the instruction files in your repository — `AGENTS.md`, `CLAUDE.md`, Cursor rules, Copilot instructions, and similar — and reports quality and safety problems with a severity rating and a 0–100 score.
+A small, deterministic CLI (`acd`) that reads the instruction files in your repository — `AGENTS.md`, `CLAUDE.md`, Cursor rules, Copilot instructions, and similar — along with committed agent configuration such as `.claude/settings.json`, Claude Code hooks and commands, and `.mcp.json`. It reports quality and safety problems with a severity rating and a 0–100 score, in the terminal or as JSON, Markdown, SARIF for code scanning, or GitHub annotations on pull requests.
 
 It runs locally, makes no network calls, and is meant to complement human review, not replace it.
 
@@ -12,7 +12,9 @@ It runs locally, makes no network calls, and is meant to complement human review
 
 AI coding agents follow whatever their instruction files tell them. A file full of `TODO` placeholders, a stray "skip tests if they're slow," or two files that contradict each other will quietly steer an agent toward unsafe or low-quality changes — and nobody notices until the diff lands.
 
-`acd` makes those problems visible in CI or on your machine, deterministically, so you can fix the instructions before they cause trouble.
+Agent configuration carries the same risk with higher stakes. A committed `bypassPermissions`, a hook that pipes a download into a shell, or an MCP server that runs an unpinned package takes effect on every contributor's machine as soon as they open the project.
+
+`acd` makes those problems visible in CI or on your machine, deterministically, so you can fix them before they cause trouble.
 
 ## What it checks
 
