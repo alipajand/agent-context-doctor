@@ -101,6 +101,13 @@ describe('computeScore', () => {
     expect(computeScore(issues).grade).toBe('risky')
   })
 
+  it('no context files → score 0, grade risky', () => {
+    const issues: ContextIssue[] = [{ ...makeIssue('high')[0], id: 'presence-no-files' }]
+    const score = computeScore(issues)
+    expect(score.total).toBe(0)
+    expect(score.grade).toBe('risky')
+  })
+
   it('max is always 100', () => {
     expect(computeScore([]).max).toBe(100)
     expect(computeScore(makeIssue('high', 5)).max).toBe(100)

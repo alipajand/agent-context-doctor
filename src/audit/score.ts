@@ -13,7 +13,14 @@ function toGrade(total: number): ScoreGrade {
   return 'risky'
 }
 
+// With no instruction files there is nothing whose quality could earn points,
+// so a single high deduction must not leave the repository graded "good".
+const NO_FILES_ISSUE = 'presence-no-files'
+
 export function computeScore(issues: ContextIssue[]): AuditScore {
+  if (issues.some((issue) => issue.id === NO_FILES_ISSUE)) {
+    return { total: 0, max: 100, grade: toGrade(0) }
+  }
   const deduction = issues.reduce((sum, issue) => sum + (DEDUCTIONS[issue.severity] ?? 0), 0)
   const total = Math.max(0, 100 - deduction)
   return { total, max: 100, grade: toGrade(total) }

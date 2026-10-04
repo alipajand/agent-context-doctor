@@ -72,7 +72,7 @@ Scoring is deduction-based: every repo starts at **100** and loses points for ea
 | `medium` | −8 |
 | `low` | −3 |
 
-Score is floored at 0. Grades: ≥90 excellent · ≥75 good · ≥50 needs-work · <50 risky.
+Score is floored at 0. A repository with no agent context files scores 0, since there is nothing whose quality could earn points. Grades: ≥90 excellent · ≥75 good · ≥50 needs-work · <50 risky.
 
 ## Context file classification
 

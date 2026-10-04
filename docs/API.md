@@ -137,7 +137,7 @@ Applies severity deductions to compute the final 0–100 score.
 function computeScore(issues: ContextIssue[]): AuditScore
 ```
 
-Deductions: `high` −20 · `medium` −8 · `low` −3. Score floored at 0.
+Deductions: `high` −20 · `medium` −8 · `low` −3. Score floored at 0. When the issues include `presence-no-files`, the score is 0 (`risky`).
 
 ---
 

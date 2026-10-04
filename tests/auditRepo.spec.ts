@@ -24,6 +24,7 @@ describe('auditRepo', () => {
     expect(noFilesIssue).toBeDefined()
     expect(noFilesIssue?.severity).toBe('high')
     expect(noFilesIssue?.message).toContain('No agent context files found')
+    expect(result.score).toEqual({ total: 0, max: 100, grade: 'risky' })
   })
 
   it('returns repoPath as absolute path', async () => {
