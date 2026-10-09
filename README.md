@@ -1,7 +1,7 @@
 # agent-context-doctor
 
 [![version](https://img.shields.io/github/v/release/alipajand/agent-context-doctor?label=version&color=blue)](https://github.com/alipajand/agent-context-doctor/releases)
-[![tests](https://img.shields.io/badge/tests-679%20passing-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-682%20passing-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
 [![CI](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/alipajand/agent-context-doctor/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/alipajand/agent-context-doctor/actions/workflows/codeql.yml)

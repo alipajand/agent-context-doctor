@@ -107,6 +107,13 @@ describe('extractCommands', () => {
     expect(extractCommands('pnpm run 11').map((c) => c.script)).toEqual(['11'])
   })
 
+  it('does not read a package manager version spec as a script', () => {
+    const cmds = extractCommands(
+      'Pinned to `pnpm@9.12.0` in package.json; npm@latest and yarn@4 also work.',
+    )
+    expect(cmds).toEqual([])
+  })
+
   it('skips bun add as a package-manager sub-command', () => {
     const cmds = extractCommands('Run bun add lodash first')
     expect(cmds.some((c) => c.script === 'add')).toBe(false)
