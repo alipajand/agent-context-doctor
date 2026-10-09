@@ -214,7 +214,15 @@ Root files match case-insensitively (`claude.md` and `CLAUDE.md` are both detect
 
 The structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`) apply to the files a tool loads as its standing instructions: root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, `.claude/CLAUDE.md`, Copilot's main instructions, and rule directories such as `.cursor/rules/` and `.claude/rules/`. Nested `AGENTS.md` files, commands, subagents, skills, and prompt libraries are supplementary: they get the content checks (risky language, secrets, hidden characters, placeholders, commands) but not the structural ones.
 
-A primary file counts as covered when the guidance appears in the file itself, in a context file it references (for example a `CLAUDE.md` that says "Follow AGENTS.md" or imports `@AGENTS.md`), or in another primary file for the same tool (a `.cursor/rules/` set is evaluated as a whole).
+A primary file counts as covered when the guidance appears in the file itself, in a context file it references (for example a `CLAUDE.md` that says "Follow AGENTS.md" or imports `@AGENTS.md`), or in another primary file for the same tool (a `.cursor/rules/` set is evaluated as a whole). References are followed through several files (`GEMINI.md` → `CLAUDE.md` → `AGENTS.md`), and `@imports` of other Markdown or text files inside the repository count too (`@docs/agent-guide.md`, up to five hops and 50 files). Cycles are followed once, and imports that leave the repository, directly or through a symlink, are not read.
+
+When a file delegates to another primary file that has the same gap, the issue is reported once, on the file that holds the guidance, so the fix is made there rather than by copying instructions into the pointer file. Files in a delegation cycle each keep their issue.
+
+### Broken references
+
+Markdown links, `@imports`, and inline-code paths are checked. Inline code counts as a path when it has a directory and a known extension (`docs/ARCHITECTURE.md`), a `./` prefix, or a trailing slash (`src/checks/`), or when it is a root-level file name with a documentation or config extension (`RELEASING.md`, `config.json`, `pyproject.toml`, `.prettierrc.yaml`, `deploy.sh`). A bare file name is only reported when no file with that name exists anywhere in the repository, so "each package has a `package.json`" is not flagged.
+
+Paths that are meant to be absent are not reported: inline code in a sentence that describes paths as ignored or excluded ("`.gitignore` excludes `.idea/`", "`out/` is ignored by git", "untracked", "not checked in"), and missing directories that the root `.gitignore` matches. A gitignored *file* used as an ordinary reference ("Read `config/local.json` first") is still reported.
 
 ## Configuration
 
@@ -362,6 +370,7 @@ Issues are matched by category, file, message, and evidence rather than line num
 - Files where agents legitimately can't run `pnpm test` locally (e.g. a Copilot file used only in CI) will still be flagged by `validation-commands`. Suppress it with `disabledChecks` or a per-file comment once confirmed.
 - Only text files matching the known patterns above are read. Binary and generated files are skipped.
 - Symlinked directories are not followed, so instruction files that live behind a directory symlink are not detected. Link the files themselves instead.
+- `broken-references` reads only the root `.gitignore`; nested `.gitignore` files, `.git/info/exclude`, and global excludes are not consulted. Delegation follows references to context files and `@imports`, not plain Markdown links to other documentation.
 - It checks how instructions are *written*, not whether an agent will follow them or whether the resulting code is correct. Human review still matters.
 
 ## Library use

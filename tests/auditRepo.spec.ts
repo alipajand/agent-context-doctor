@@ -263,3 +263,174 @@ describe('auditRepo file-size budget', () => {
     ])
   })
 })
+
+describe('auditRepo delegated instruction files (#61)', () => {
+  const STRUCTURAL = ['safety-boundaries', 'validation-commands', 'final-reporting']
+  const fullGuidance = [
+    '# Agents',
+    'Run `pnpm test` before finishing.',
+    'Ask before changing auth or billing.',
+    '## Final report',
+    'List files changed and commands run.',
+  ].join('\n')
+
+  async function write(rel: string, content: string): Promise<void> {
+    const full = path.join(tmpDir, rel)
+    await fs.mkdir(path.dirname(full), { recursive: true })
+    await fs.writeFile(full, content)
+  }
+
+  async function structuralByFile(): Promise<Record<string, string[]>> {
+    const result = await auditRepo(tmpDir)
+    const byFile: Record<string, string[]> = {}
+    for (const issue of result.issues) {
+      if (!STRUCTURAL.includes(issue.category)) continue
+      const key = issue.file.replace(/\\/g, '/')
+      byFile[key] = [...(byFile[key] ?? []), issue.category].sort()
+    }
+    return byFile
+  }
+
+  it('reports the issue #61 reproduction only on the file that holds the guidance', async () => {
+    await write('package.json', '{"scripts":{"test":"node --test"}}')
+    await write(
+      'AGENTS.md',
+      '# AGENTS\n\nRun `npm test` before finishing. Never push to main.\n\n## Final report\n\nFiles changed, commands run.\n',
+    )
+    await write(
+      'CLAUDE.md',
+      '# CLAUDE.md\n\nFollow [AGENTS.md](AGENTS.md); it is the single source of truth.\n',
+    )
+    expect(await structuralByFile()).toEqual({ 'AGENTS.md': ['safety-boundaries'] })
+  })
+
+  it('reports nothing when the delegated file has all the guidance', async () => {
+    await write('AGENTS.md', fullGuidance)
+    await write('CLAUDE.md', 'Follow AGENTS.md.')
+    expect(await structuralByFile()).toEqual({})
+  })
+
+  it('keeps the findings on a file that delegates to a file that does not exist', async () => {
+    await write('CLAUDE.md', 'Follow [AGENTS.md](AGENTS.md).')
+    expect(await structuralByFile()).toEqual({ 'CLAUDE.md': STRUCTURAL.slice().sort() })
+  })
+
+  it('follows delegation through several files', async () => {
+    await write('AGENTS.md', fullGuidance)
+    await write('CLAUDE.md', 'Follow AGENTS.md.')
+    await write('GEMINI.md', 'Follow CLAUDE.md.')
+    expect(await structuralByFile()).toEqual({})
+  })
+
+  it('reports a guidance gap once, at the end of a delegation chain', async () => {
+    await write('AGENTS.md', 'Run `pnpm test`.\n## Final report\nFiles changed, commands run.')
+    await write('CLAUDE.md', 'Follow AGENTS.md.')
+    await write('GEMINI.md', 'Follow CLAUDE.md.')
+    expect(await structuralByFile()).toEqual({ 'AGENTS.md': ['safety-boundaries'] })
+  })
+
+  it('follows @imports of in-repository files that are not context files', async () => {
+    await write('docs/agent-guide.md', fullGuidance)
+    await write('AGENTS.md', '@docs/agent-guide.md')
+    await write('CLAUDE.md', 'Follow AGENTS.md.')
+    expect(await structuralByFile()).toEqual({})
+  })
+
+  it('resolves @imports relative to the importing file', async () => {
+    await write('.claude/shared/guide.md', fullGuidance)
+    await write('.claude/CLAUDE.md', '@shared/guide.md')
+    expect(await structuralByFile()).toEqual({})
+  })
+
+  it('does not follow @imports that leave the repository', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(path.join(outside, 'guide.md'), fullGuidance)
+      const rel = path.relative(tmpDir, path.join(outside, 'guide.md')).replace(/\\/g, '/')
+      await write('CLAUDE.md', `@${rel}`)
+      expect(await structuralByFile()).toEqual({ 'CLAUDE.md': STRUCTURAL.slice().sort() })
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('does not follow an in-repository symlink whose target is outside', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(path.join(outside, 'guide.md'), fullGuidance)
+      await fs.mkdir(path.join(tmpDir, 'docs'))
+      await fs.symlink(path.join(outside, 'guide.md'), path.join(tmpDir, 'docs', 'guide.md'))
+      await write('CLAUDE.md', '@docs/guide.md')
+      expect(await structuralByFile()).toEqual({ 'CLAUDE.md': STRUCTURAL.slice().sort() })
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('terminates on a delegation cycle and reports the gap on each file in it', async () => {
+    await write('AGENTS.md', 'See CLAUDE.md. Run `pnpm test`.\n## Final report\nFiles changed.')
+    await write('CLAUDE.md', 'See AGENTS.md.')
+    expect(await structuralByFile()).toEqual({
+      'AGENTS.md': ['safety-boundaries'],
+      'CLAUDE.md': ['safety-boundaries'],
+    })
+  })
+
+  it('terminates on a three-file cycle that has the guidance', async () => {
+    await write('AGENTS.md', `${fullGuidance}\nSee GEMINI.md.`)
+    await write('CLAUDE.md', 'See AGENTS.md.')
+    await write('GEMINI.md', 'See CLAUDE.md.')
+    expect(await structuralByFile()).toEqual({})
+  })
+
+  it('terminates on @import cycles', async () => {
+    await write('docs/a.md', '@b.md')
+    await write('docs/b.md', '@a.md')
+    await write('CLAUDE.md', '@docs/a.md\n@CLAUDE.md')
+    expect(await structuralByFile()).toEqual({ 'CLAUDE.md': STRUCTURAL.slice().sort() })
+  })
+
+  it('keeps findings on a file that delegates to a non-primary file without the guidance', async () => {
+    await write('docs/prompts/style.md', 'Write short sentences.')
+    await write('CLAUDE.md', 'Follow docs/prompts/style.md.')
+    expect(await structuralByFile()).toEqual({ 'CLAUDE.md': STRUCTURAL.slice().sort() })
+  })
+
+  it('evaluates a large rules directory once instead of once per file', async () => {
+    const big = `${'Ask before changing auth. '.repeat(8_000)}\n`
+    for (let i = 0; i < 40; i++) {
+      await write(`.cursor/rules/r${i}.mdc`, `${big}See r${(i + 1) % 40}.mdc`)
+    }
+    const start = Date.now()
+    const byFile = await structuralByFile()
+    expect(Object.keys(byFile)).toHaveLength(40)
+    expect(Date.now() - start).toBeLessThan(10_000)
+  }, 30_000)
+
+  it('handles thousands of rule files in roughly linear time', async () => {
+    await fs.mkdir(path.join(tmpDir, '.cursor', 'rules'), { recursive: true })
+    await Promise.all(
+      Array.from({ length: 3_000 }, (_, i) =>
+        fs.writeFile(path.join(tmpDir, '.cursor', 'rules', `r${i}.mdc`), ''),
+      ),
+    )
+    const start = Date.now()
+    const byFile = await structuralByFile()
+    expect(Object.keys(byFile)).toHaveLength(3_000)
+    expect(Date.now() - start).toBeLessThan(15_000)
+  }, 60_000)
+
+  it('caps @import read attempts', async () => {
+    const imports = Array.from({ length: 1_000 }, (_, i) => `@docs/missing-${i}.md`).join('\n')
+    await write('CLAUDE.md', imports)
+    const start = Date.now()
+    expect(await structuralByFile()).toEqual({ 'CLAUDE.md': STRUCTURAL.slice().sort() })
+    expect(Date.now() - start).toBeLessThan(5_000)
+  })
+
+  it('keeps findings that the delegated file does not share', async () => {
+    await write('AGENTS.md', 'Ask before changing auth. Run `pnpm test`.')
+    await write('CLAUDE.md', 'Follow AGENTS.md.\n## Final report\nFiles changed, commands run.')
+    expect(await structuralByFile()).toEqual({ 'AGENTS.md': ['final-reporting'] })
+  })
+})

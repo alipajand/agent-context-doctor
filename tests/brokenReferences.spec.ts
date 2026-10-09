@@ -42,6 +42,17 @@ describe('extractFileReferences', () => {
     expect(targets(line)).toEqual([])
   })
 
+  it('handles hostile lines in linear time', () => {
+    const start = Date.now()
+    extractFileReferences('['.repeat(200_000))
+    extractFileReferences(`[a](b "${'x'.repeat(200_000)}`)
+    extractFileReferences('[]('.repeat(350_000))
+    extractFileReferences(`\`a/${'.'.repeat(600)}\` `.repeat(2_000))
+    extractFileReferences(`\`a${'.'.repeat(200_000)}x\``)
+    extractFileReferences(`\`./${'.'.repeat(200_000)}x\``)
+    expect(Date.now() - start).toBeLessThan(5_000)
+  })
+
   it('skips fenced code blocks', () => {
     expect(targets('```bash\ncat `docs/missing.md`\n```')).toEqual([])
   })
@@ -111,5 +122,148 @@ describe('auditRepo broken references', () => {
     await write('AGENTS.md', 'Read `docs/missing.md`.')
     const result = await auditRepo(tmpDir, { disabledChecks: ['broken-references'] })
     expect(result.issues.some((i) => i.category === 'broken-references')).toBe(false)
+  })
+
+  describe('root-level file names in backticks (#66)', () => {
+    it('reports the issue #66 reproduction: `RELEASING.md` and `docs/ARCHITECTURE.md`', async () => {
+      await write(
+        'AGENTS.md',
+        'Release steps live in `RELEASING.md`. Read `docs/ARCHITECTURE.md` first. Run `npm test`.',
+      )
+      const issues = await refIssues()
+      expect(issues.map((i) => i.message).sort()).toEqual([
+        'Instruction references a file that does not exist: "RELEASING.md"',
+        'Instruction references a file that does not exist: "docs/ARCHITECTURE.md"',
+      ])
+    })
+
+    it.each([
+      'README.md',
+      'ARCHITECTURE.md',
+      'config.json',
+      'pyproject.toml',
+      'deploy.sh',
+      '.prettierrc.yaml',
+    ])('reports a missing root-level `%s`', async (name) => {
+      await write('AGENTS.md', `See \`${name}\` before you start.`)
+      expect((await refIssues()).map((i) => i.line)).toEqual([1])
+    })
+
+    it('accepts a root-level name that exists', async () => {
+      await write('RELEASING.md')
+      await write('AGENTS.md', 'Release steps live in `RELEASING.md`.')
+      expect(await refIssues()).toEqual([])
+    })
+
+    it('accepts a bare name that exists next to the referencing file', async () => {
+      await write('packages/web/SETUP.md')
+      await write('packages/web/AGENTS.md', 'Read `SETUP.md` first.')
+      expect(await refIssues()).toEqual([])
+    })
+
+    it('accepts a bare name that exists elsewhere in the repository', async () => {
+      await write('packages/api/package.json', '{}')
+      await write('AGENTS.md', 'Each package declares its scripts in `package.json`.')
+      expect(await refIssues()).toEqual([])
+    })
+
+    it.each([
+      'Call `config.get` to read settings.',
+      'Edit `index.ts` carefully.',
+      'Set `foo.json` to whatever you need.',
+      'Run `node.js` scripts with tsx.',
+      'Open `localhost:3000`.',
+      'Match `*.md` files.',
+      'Write `.md` files.',
+    ])('does not treat a code identifier as a root-level file: %s', async (line) => {
+      await write('AGENTS.md', line)
+      expect(await refIssues()).toEqual([])
+    })
+
+    it('still ignores bare names inside fenced code blocks', async () => {
+      await write('AGENTS.md', '```bash\ncat `RELEASING.md`\n```')
+      expect(await refIssues()).toEqual([])
+    })
+
+    it('still reports root-level Markdown links', async () => {
+      await write('AGENTS.md', 'See [releasing](RELEASING.md).')
+      expect((await refIssues()).map((i) => i.line)).toEqual([1])
+    })
+  })
+
+  describe('ignored and excluded paths (#62)', () => {
+    it('does not report the issue #62 reproduction: paths described as ignored', async () => {
+      await write(
+        'AGENTS.md',
+        'Run `npm test`.\n\n`.gitignore` excludes `.idea/` and `.serena/`.\n',
+      )
+      expect(await refIssues()).toEqual([])
+    })
+
+    it.each([
+      'Editor state in `.idea/` is git-ignored.',
+      'Generated files under `out/reports/` are ignored by git.',
+      'Do not commit `.serena/`; it is untracked.',
+      'Local settings in `config/local.json` are not checked in.',
+      'The build excludes `scratch/notes.md`.',
+    ])('does not report paths on a line that describes them as excluded: %s', async (line) => {
+      await write('AGENTS.md', line)
+      expect(await refIssues()).toEqual([])
+    })
+
+    it('limits the exclusion wording to its own sentence', async () => {
+      await write(
+        'AGENTS.md',
+        'Read `docs/missing.md` first. `public/` is generated and gitignored.',
+      )
+      expect((await refIssues()).map((i) => i.message)).toEqual([
+        'Instruction references a file that does not exist: "docs/missing.md"',
+      ])
+    })
+
+    it('does not read "ignored" as a verb about something else as exclusion', async () => {
+      await write('AGENTS.md', 'The old menu ignored `hidden`, and the decks live in `decks/`.')
+      expect((await refIssues()).map((i) => i.message)).toEqual([
+        'Instruction references a file that does not exist: "decks/"',
+      ])
+    })
+
+    it('does not report a directory that the root .gitignore matches', async () => {
+      await write('.gitignore', '# editors\n.idea/\n/.serena/\n*.log\n')
+      await write('AGENTS.md', 'IDE settings live in `.idea/` and `.serena/`.')
+      expect(await refIssues()).toEqual([])
+    })
+
+    it('still reports a gitignored file used as an ordinary reference', async () => {
+      await write('.gitignore', 'config/local.json\n')
+      await write('AGENTS.md', 'Read `config/local.json` before you start.')
+      expect((await refIssues()).map((i) => i.message)).toEqual([
+        'Instruction references a file that does not exist: "config/local.json"',
+      ])
+    })
+
+    it('still reports a missing directory that .gitignore does not match', async () => {
+      await write('.gitignore', '.idea/\n')
+      await write('AGENTS.md', 'Checks live in `src/checks/`.')
+      expect((await refIssues()).map((i) => i.line)).toEqual([1])
+    })
+
+    it('respects negated .gitignore patterns', async () => {
+      await write('.gitignore', 'generated/*\n!generated/keep/\n')
+      await write('AGENTS.md', 'See `generated/keep/`.')
+      expect((await refIssues()).map((i) => i.line)).toEqual([1])
+    })
+
+    it('does not read a .gitignore that links outside the repository', async () => {
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+      try {
+        await fs.writeFile(path.join(outside, 'gitignore'), 'src/\n')
+        await fs.symlink(path.join(outside, 'gitignore'), path.join(tmpDir, '.gitignore'))
+        await write('AGENTS.md', 'Checks live in `src/checks/`.')
+        expect((await refIssues()).map((i) => i.line)).toEqual([1])
+      } finally {
+        await fs.rm(outside, { recursive: true, force: true })
+      }
+    })
   })
 })

@@ -18,6 +18,8 @@ The tool has no runtime server, no database, no network dependencies, and no LLM
 | `src/audit/detectContextFiles.ts` | Discovers and classifies agent context files in a repo |
 | `src/audit/checks/*` | Individual static checks — one pure function per check |
 | `src/audit/score.ts` | Deduction-based scoring: starts at 100, subtracts per severity |
+| `src/audit/delegation.ts` | Follows references and `@imports` between instruction files (bounded, cycle-safe) so structural checks see delegated guidance |
+| `src/audit/gitignore.ts` | Bounded subset of `.gitignore` matching used to tell ignored paths from broken references |
 | `src/audit/evidence.ts` | Extracts line-level evidence snippets for check findings |
 | `src/audit/negation.ts` | Detects negated directives ("Never skip tests") so safety guidance is not reported as risky |
 | `src/audit/suppressions.ts` | Parses `acd-disable` inline comments; filters suppressed issues |
@@ -88,7 +90,7 @@ Score is floored at 0. A repository with no agent context files scores 0, since 
 | `prompt` | `docs/prompts/**`, `.github/instructions/**` |
 | `unknown` | anything else matched by the glob |
 
-Only primary instruction files (`agents`, `claude`, `cursor`, `copilot`) are checked by `checkSafetyBoundaries`, `checkValidationCommands`, and `checkFinalReporting`.
+Only primary instruction files (`agents`, `claude`, `cursor`, `copilot`) are checked by `checkSafetyBoundaries`, `checkValidationCommands`, and `checkFinalReporting`. Each is evaluated together with the files it delegates to (`src/audit/delegation.ts`); a file that delegates to a primary file with the same gap leaves the issue to that file unless the two delegate to each other.
 
 ## Report formats
 
