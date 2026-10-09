@@ -56,4 +56,28 @@ describe('readPackageScripts', () => {
     await fs.mkdir(path.join(tmpDir, 'package.json'))
     expect(await readPackageScripts(tmpDir)).toBeNull()
   })
+
+  it('returns null for a package.json that links outside the repository', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(
+        path.join(outside, 'package.json'),
+        JSON.stringify({ scripts: { a: 'b' } }),
+      )
+      await fs.symlink(path.join(outside, 'package.json'), path.join(tmpDir, 'package.json'))
+      expect(await readPackageScripts(tmpDir)).toBeNull()
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('reads a package.json that links to a file inside the repository', async () => {
+    await fs.mkdir(path.join(tmpDir, 'config'))
+    await fs.writeFile(
+      path.join(tmpDir, 'config', 'package.json'),
+      JSON.stringify({ scripts: { test: 'vitest' } }),
+    )
+    await fs.symlink(path.join(tmpDir, 'config', 'package.json'), path.join(tmpDir, 'package.json'))
+    expect(await readPackageScripts(tmpDir)).toEqual({ test: 'vitest' })
+  })
 })

@@ -35,6 +35,7 @@ import fs from 'node:fs/promises'
 import { computeScore } from './score.js'
 import { readTextFile } from '../fs/readTextFile.js'
 import { readPackageScripts } from '../fs/readPackageJson.js'
+import { readRepoFile } from '../fs/readRepoFile.js'
 import {
   filterSuppressedIssues,
   parseSuppressions,
@@ -100,6 +101,14 @@ async function findMissingReferences(
 ): Promise<Set<string>> {
   const missing = new Set<string>()
   const bases = [repoPath, path.resolve(repoPath, path.dirname(filePath))]
+  const realRepo = await fs.realpath(repoPath).catch(() => repoPath)
+  // A candidate only counts when its real path stays inside the repository, so
+  // a symlinked directory cannot be used to probe for files outside it.
+  const existsInside = (candidate: string): Promise<boolean> =>
+    fs.realpath(candidate).then(
+      (real) => isWithin(realRepo, real),
+      () => false,
+    )
 
   for (const { target, bare } of extractFileReferences(content)) {
     // ESM TypeScript imports name `.js` files whose source is `.ts`.
@@ -113,12 +122,7 @@ async function findMissingReferences(
 
     let found = false
     for (const candidate of candidates) {
-      if (
-        await fs.stat(candidate).then(
-          () => true,
-          () => false,
-        )
-      ) {
+      if (await existsInside(candidate)) {
         found = true
         break
       }
@@ -139,20 +143,9 @@ async function findMissingReferences(
   return missing
 }
 
-/**
- * Read a file by its repo-relative path, or '' when it is missing or resolves
- * outside the repository (a symlink), so its contents never reach evidence.
- */
-async function readRepoFile(repoPath: string, rel: string): Promise<string> {
-  const realRepo = await fs.realpath(repoPath).catch(() => repoPath)
-  const realFile = await fs.realpath(path.join(repoPath, rel)).catch(() => null)
-  if (realFile === null || !isWithin(realRepo, realFile)) return ''
-  return readTextFile(realFile)
-}
-
 async function readMakeTargets(repoPath: string): Promise<Set<string> | null> {
   for (const name of ['GNUmakefile', 'makefile', 'Makefile']) {
-    const content = await readTextFile(path.join(repoPath, name))
+    const content = await readRepoFile(repoPath, name)
     if (content !== '') return parseMakeTargets(content)
   }
   return null

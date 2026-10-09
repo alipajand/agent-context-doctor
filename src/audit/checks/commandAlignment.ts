@@ -359,7 +359,9 @@ export function extractMakeTargets(content: string): ExtractedCommand[] {
 export function parseMakeTargets(makefile: string): Set<string> {
   const targets = new Set<string>()
   for (const line of makefile.split('\n')) {
-    const match = /^([A-Za-z0-9_.\-/ ]+?)\s*::?(?!=)/.exec(line)
+    // Names and the blanks between them cannot overlap, which keeps matching
+    // linear on long lines of blanks that end without a colon.
+    const match = /^ *([A-Za-z0-9_.\/-]+(?:[ \t]+[A-Za-z0-9_.\/-]+)*)[ \t]*::?(?![:=])/.exec(line)
     if (!match) continue
     for (const name of match[1].split(/\s+/)) {
       if (name && !name.startsWith('.')) targets.add(name)

@@ -1,5 +1,4 @@
-import path from 'node:path'
-import { readTextFile } from './readTextFile.js'
+import { readRepoFile } from './readRepoFile.js'
 
 export type PackageJsonScripts = Record<string, string>
 
@@ -13,7 +12,7 @@ function toScripts(value: unknown): PackageJsonScripts {
 }
 
 export async function readPackageScripts(repoPath: string): Promise<PackageJsonScripts | null> {
-  const raw = await readTextFile(path.join(repoPath, 'package.json'))
+  const raw = await readRepoFile(repoPath, 'package.json')
   if (raw === '') return null
   try {
     const pkg = JSON.parse(raw) as { scripts?: unknown } | null
