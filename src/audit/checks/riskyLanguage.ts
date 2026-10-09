@@ -1,13 +1,16 @@
 import type { ContextIssue } from '../../types.js'
 import { getLineEvidence } from '../evidence.js'
-import { isNegated } from '../negation.js'
+import { createLineContext, type LineContext } from '../lineContext.js'
+import { findSkipValidation } from '../skipValidation.js'
 
 type RiskyPattern = { pattern: RegExp; label: string }
+
+const SKIP_TESTS_LABEL = 'skip tests'
 
 // Matches are ignored when negated earlier in the same clause ("Never skip
 // tests", "Do not force push"), so only permissive wording is reported.
 const HIGH_RISK_PATTERNS: RiskyPattern[] = [
-  { pattern: /skip\s+tests/i, label: 'skip tests' },
+  { pattern: /skip\s+tests/i, label: SKIP_TESTS_LABEL },
   { pattern: /ignore\s+failing\s+tests/i, label: 'ignore failing tests' },
   { pattern: /disable\s+tests/i, label: 'disable tests' },
   {
@@ -76,22 +79,54 @@ function findRisky(
 ): ContextIssue[] {
   const issues: ContextIssue[] = []
   const lines = content.split('\n')
+  const reported = new Set<string>()
+
+  const report = (idx: number, label: string) => {
+    // Several phrasings of one instruction on a line are one issue.
+    const key = `${idx}:${label}`
+    if (reported.has(key)) return
+    reported.add(key)
+    issues.push({
+      id: `risky-${severity}-${filePath}-${idx}-${label}`,
+      severity,
+      category: 'risky-language',
+      file: filePath,
+      line: idx + 1,
+      evidence: getLineEvidence(content, idx + 1),
+      message: `Risky instruction: "${label}"`,
+      recommendation: severity === 'high' ? HIGH_RECOMMENDATION : MEDIUM_RECOMMENDATION,
+    })
+  }
+
+  // Built once per line that has a match, so every match on a long line is
+  // checked with a lookup instead of a rescan.
+  const contexts = new Map<number, LineContext>()
+  const contextFor = (idx: number): LineContext => {
+    let context = contexts.get(idx)
+    if (!context) {
+      context = createLineContext(lines[idx])
+      contexts.set(idx, context)
+    }
+    return context
+  }
 
   for (const { pattern, label } of patterns) {
     const global = new RegExp(pattern.source, `${pattern.flags}g`)
     lines.forEach((line, idx) => {
-      const permissive = [...line.matchAll(global)].some((m) => !isNegated(line, m.index))
-      if (!permissive) return
-      issues.push({
-        id: `risky-${severity}-${filePath}-${idx}-${label}`,
-        severity,
-        category: 'risky-language',
-        file: filePath,
-        line: idx + 1,
-        evidence: getLineEvidence(content, idx + 1),
-        message: `Risky instruction: "${label}"`,
-        recommendation: severity === 'high' ? HIGH_RECOMMENDATION : MEDIUM_RECOMMENDATION,
-      })
+      for (const m of line.matchAll(global)) {
+        if (!contextFor(idx).negatedAt(m.index)) {
+          report(idx, label)
+          break
+        }
+      }
+    })
+  }
+
+  // Advice to skip tests in other words: "If the tests are slow, skip them",
+  // "Skip the tests when they are slow", "rely on CI instead".
+  if (severity === 'high') {
+    lines.forEach((line, idx) => {
+      if (findSkipValidation(line) !== null) report(idx, SKIP_TESTS_LABEL)
     })
   }
 

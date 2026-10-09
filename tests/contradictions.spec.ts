@@ -241,3 +241,136 @@ describe('checkContradictions negation', () => {
     expect(issues.map((i) => i.id)).toContain('contradiction-tests')
   })
 })
+
+describe('checkContradictions package manager and skipped tests (#64)', () => {
+  const groups = (files: Array<{ path: string; content: string }>) =>
+    checkContradictions(files).map((i) => i.id)
+
+  it('reports both contradictions in the issue #64 reproduction', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'package.json'),
+      '{"packageManager":"pnpm@9.12.0","scripts":{"test":"vitest run"}}',
+    )
+    await fs.writeFile(
+      path.join(tmpDir, 'AGENTS.md'),
+      '# AGENTS\n\nUse pnpm. Always run `pnpm test` before finishing. Never skip failing tests. Never push to main.\n\n## Final report\n\nFiles changed, commands run.\n',
+    )
+    await fs.writeFile(
+      path.join(tmpDir, 'CLAUDE.md'),
+      '# CLAUDE.md\n\n- Use npm for everything: `npm install`, `npm test`.\n- If the tests are slow, skip them and rely on CI.\n',
+    )
+    const result = await auditRepo(tmpDir)
+    const issues = result.issues.filter((i) => i.category === 'contradictions')
+    expect(issues.map((i) => [i.id, i.severity, i.files])).toEqual([
+      ['contradiction-tests', 'high', ['AGENTS.md', 'CLAUDE.md']],
+      ['contradiction-package-manager', 'medium', ['AGENTS.md', 'CLAUDE.md']],
+    ])
+    expect(issues[0].evidence).toContain(
+      'CLAUDE.md: "If the tests are slow, skip them and rely on CI."',
+    )
+    expect(issues[1].evidence).toBe('AGENTS.md: "Use pnpm" vs CLAUDE.md: "Use npm"')
+  })
+
+  it.each([
+    ['Always use pnpm.', 'We use yarn for installs.'],
+    ['- Use bun for scripts.', 'Only use npm.'],
+    ['The package manager is pnpm.', 'Use yarn.'],
+    ['Package manager: `pnpm`', 'Always use npm.'],
+    ['Use pnpm.', 'Never mind the old docs. Use npm.'],
+    ['Use pnpm.', 'Do not use yarn. Use npm for everything.'],
+  ])('reports equivalent wording: %s / %s', (a, b) => {
+    expect(
+      groups([
+        { path: 'AGENTS.md', content: a },
+        { path: 'CLAUDE.md', content: b },
+      ]),
+    ).toEqual(['contradiction-package-manager'])
+  })
+
+  it.each([
+    ['Use pnpm.', 'Use pnpm, never npm.'],
+    ['Use pnpm.', 'Do not use npm or yarn.'],
+    ['Use pnpm.', 'Run the npm scripts defined in package.json.'],
+    ['Use pnpm.', 'If you use yarn, delete yarn.lock first.'],
+    ['Use pnpm.', 'The docs site uses npm.'],
+    ['Use pnpm instead of npm.', 'Use pnpm for everything.'],
+    ['Use pnpm.', 'Never "use npm for everything".'],
+  ])('does not report complementary wording: %s / %s', (a, b) => {
+    expect(
+      groups([
+        { path: 'AGENTS.md', content: a },
+        { path: 'CLAUDE.md', content: b },
+      ]),
+    ).toEqual([])
+  })
+
+  it('ignores package manager preferences outside primary instruction files', () => {
+    expect(
+      groups([
+        { path: 'AGENTS.md', content: 'Use pnpm.' },
+        { path: path.join('examples', 'legacy', 'AGENTS.md'), content: 'Use yarn.' },
+        { path: path.join('.claude', 'commands', 'release.md'), content: 'Use npm.' },
+      ]),
+    ).toEqual([])
+  })
+
+  it.each([
+    ['Never skip failing tests.', 'If the tests are slow, skip them.'],
+    ['Always run `pnpm test` before finishing.', 'Skip the tests when they are slow.'],
+    ["Don't skip tests.", 'Tests can be skipped if they take too long.'],
+    ['Tests must always pass.', 'Rely on CI instead of running the tests locally.'],
+  ])('reports skipping tests against a rule to run them: %s / %s', (a, b) => {
+    expect(
+      groups([
+        { path: 'AGENTS.md', content: a },
+        { path: 'CLAUDE.md', content: b },
+      ]),
+    ).toEqual(['contradiction-tests'])
+  })
+
+  it.each([
+    ['Always run tests before finishing.', 'Skip the e2e tests for documentation-only changes.'],
+    ['Never skip failing tests.', 'Do not skip the tests when they are slow.'],
+    ['Never skip failing tests.', 'Report which tests were skipped.'],
+    ['Always run tests before finishing.', 'Never write "skip them if the tests are slow".'],
+  ])('does not report a legitimate exception or agreement: %s / %s', (a, b) => {
+    expect(
+      groups([
+        { path: 'AGENTS.md', content: a },
+        { path: 'CLAUDE.md', content: b },
+      ]),
+    ).toEqual([])
+  })
+
+  it('handles hostile lines in linear time and bounds the evidence', () => {
+    const start = Date.now()
+    const issues = checkContradictions([
+      { path: 'AGENTS.md', content: `Use pnpm. ${'never always use npm '.repeat(50_000)}` },
+      { path: 'CLAUDE.md', content: `"${'we use npm '.repeat(90_000)}"` },
+      { path: 'GEMINI.md', content: 'never skip tests '.repeat(60_000) },
+    ])
+    expect(Date.now() - start).toBeLessThan(5_000)
+    expect(issues.every((i) => (i.evidence ?? '').length < 400)).toBe(true)
+  })
+
+  it('shows a padded phrase as one line of evidence', () => {
+    const [issue] = checkContradictions([
+      { path: 'AGENTS.md', content: 'Use pnpm.' },
+      { path: 'CLAUDE.md', content: `we${' '.repeat(500_000)}use yarn` },
+    ])
+    expect(issue.evidence).toBe('AGENTS.md: "Use pnpm" vs CLAUDE.md: "we use yarn"')
+  })
+
+  it('can be suppressed in every involved file', async () => {
+    await fs.writeFile(
+      path.join(tmpDir, 'AGENTS.md'),
+      '<!-- acd-disable-file contradictions -->\nUse pnpm.',
+    )
+    await fs.writeFile(
+      path.join(tmpDir, 'CLAUDE.md'),
+      '<!-- acd-disable-file contradictions -->\nUse npm for everything.',
+    )
+    const result = await auditRepo(tmpDir)
+    expect(result.issues.some((i) => i.category === 'contradictions')).toBe(false)
+  })
+})

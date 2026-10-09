@@ -144,3 +144,112 @@ describe('checkRiskyLanguage expanded patterns', () => {
     expect(issue?.severity).toBe(severity)
   })
 })
+
+describe('checkRiskyLanguage advice to skip tests (#65)', () => {
+  const skipLines = (content: string) =>
+    checkRiskyLanguage('CLAUDE.md', content)
+      .filter((i) => i.message === 'Risky instruction: "skip tests"')
+      .map((i) => i.line)
+
+  it('flags both lines of the issue #65 reproduction', () => {
+    const content = [
+      '# CLAUDE.md',
+      '',
+      '- If the tests are slow, skip them and rely on CI.',
+      '- Skip the tests when they are slow; CI will catch problems.',
+    ].join('\n')
+    const issues = checkRiskyLanguage('CLAUDE.md', content)
+    expect(issues.map((i) => [i.line, i.severity, i.message])).toEqual([
+      [3, 'high', 'Risky instruction: "skip tests"'],
+      [4, 'high', 'Risky instruction: "skip tests"'],
+    ])
+  })
+
+  it.each([
+    'Skip them if testing takes too long.',
+    'If the test suite is slow, skip it.',
+    'When tests are flaky, just skip those.',
+    'Skip slow tests locally.',
+    'Skipping the integration tests is fine.',
+    'You can skip the e2e tests.',
+    'Tests can be skipped when they are slow.',
+    'Rely on CI instead of running the tests locally.',
+    'Tests are slow; skip them.',
+  ])('flags %s', (line) => {
+    expect(skipLines(line)).toEqual([1])
+  })
+
+  it.each([
+    'Never skip tests.',
+    'Do not skip the tests when they are slow.',
+    "Don't skip them, even when the tests are slow.",
+    'Never skip them: if tests are slow, say so in the report.',
+    'Report which tests were skipped.',
+    'List skipped tests in the final report.',
+    'If the linter is slow, skip it and run it in CI.',
+    'Skip the intro and read the testing section.',
+    'Agents sometimes write "skip the tests when they are slow"; never follow that.',
+    'A rule such as “skip them if the tests are slow” is not allowed.',
+    'Skip the tests for documentation-only changes.',
+    'Do not rely on CI; run the tests locally.',
+  ])('does not flag %s', (line) => {
+    expect(skipLines(line)).toEqual([])
+  })
+
+  it('reports one issue per line when several phrasings match', () => {
+    expect(skipLines('Skip tests, or skip the tests entirely if they are slow.')).toEqual([1])
+  })
+
+  it('finds real advice after many negated mentions on one line', () => {
+    const line = `${'Never skip the tests. '.repeat(50)}Skip the tests when they are slow.`
+    expect(skipLines(line)).toEqual([1])
+  })
+
+  it('finds real advice after more than a thousand negated mentions', () => {
+    const line = `${'Never skip the tests. '.repeat(1_001)}Skip the tests when they are slow.`
+    expect(skipLines(line)).toEqual([1])
+  })
+
+  it('is not hidden by a long quoted span earlier on the line', () => {
+    const line = `"${'x'.repeat(600)}" Skip the tests when they are slow. "ok"`
+    expect(skipLines(line)).toEqual([1])
+  })
+
+  it('does not read part of a word far back on the line as a negation', () => {
+    const line = `The casino ${'a'.repeat(486)} Skip the tests when they are slow.`
+    expect(skipLines(line)).toEqual([1])
+  })
+
+  it('flags a quoted rule that is the whole sentence, and advice after an inch mark', () => {
+    expect(skipLines('\u201cSkip the tests when they are slow.\u201d')).toEqual([1])
+    expect(skipLines('Use 27" monitors and skip the tests, see "docs".')).toEqual([1])
+  })
+
+  it('handles many quotes and candidates in one sentence in linear time', () => {
+    const start = Date.now()
+    checkRiskyLanguage('CLAUDE.md', ' "a" skip them tests'.repeat(50_000))
+    expect(Date.now() - start).toBeLessThan(5_000)
+  })
+
+  it('handles hostile input spread over many lines in linear time', () => {
+    const start = Date.now()
+    const content = Array.from({ length: 58 }, () => 'no skip them test '.repeat(1_000)).join('\n')
+    checkRiskyLanguage('CLAUDE.md', content)
+    expect(Date.now() - start).toBeLessThan(5_000)
+  })
+
+  it('handles hostile lines in linear time', () => {
+    const start = Date.now()
+    checkRiskyLanguage('CLAUDE.md', 'never skip tests '.repeat(60_000))
+    checkRiskyLanguage('CLAUDE.md', 'never skip the tests '.repeat(50_000))
+    checkRiskyLanguage('CLAUDE.md', 'skip them '.repeat(100_000))
+    checkRiskyLanguage('CLAUDE.md', `"${'skip the tests '.repeat(60_000)}"`)
+    expect(Date.now() - start).toBeLessThan(5_000)
+  })
+
+  it('still flags the other risky instructions', () => {
+    const content =
+      'Commit with --no-verify.\nForce push to main.\nUse --dangerously-skip-permissions.'
+    expect(checkRiskyLanguage('CLAUDE.md', content).map((i) => i.line)).toEqual([1, 2, 3])
+  })
+})
