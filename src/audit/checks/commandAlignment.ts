@@ -134,7 +134,10 @@ export function extractCommands(content: string): ExtractedCommand[] {
   content.split('\n').forEach((line, idx) => {
     for (const match of line.matchAll(/\b(pnpm|npm|yarn|bun)\b/g)) {
       const pm = match[1] as PackageManager
-      const tokens = commandSegment(line.slice(match.index + match[0].length))
+      const after = line.slice(match.index + match[0].length)
+      // `pnpm@9.12.0` or `npm@latest` names a release, not a command.
+      if (after.startsWith('@')) continue
+      const tokens = commandSegment(after)
       const parsed = parseInvocation(tokens)
       if (!parsed || parsed.workspaceScoped) continue
 
