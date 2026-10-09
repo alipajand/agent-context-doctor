@@ -1,9 +1,10 @@
 // `rules.ignoreFiles` comes from the audited repository's `.acdrc`, so it is
-// untrusted. fast-glob expands brace patterns with `braces`, which recurses
-// once per nesting level (GHSA-vfj7-8cjw-p6xm: a pattern well under its
-// 10,000-character limit can exhaust the stack) and returns every combination
-// of sibling groups (`{a,b}` repeated 20 times is over a million patterns).
-// Both are bounded here before a pattern reaches fast-glob.
+// untrusted. Brace patterns are expanded before matching, and both their
+// nesting depth and the number of combinations of sibling groups (`{a,b}`
+// repeated 20 times is over a million patterns) grow the work without bound.
+// The `braces` expander fast-glob used could also exhaust the stack on deep
+// nesting (GHSA-vfj7-8cjw-p6xm). Both are bounded here before a pattern
+// reaches the glob.
 
 /** Deepest brace nesting accepted in an ignore pattern. */
 export const MAX_BRACE_DEPTH = 10
@@ -39,7 +40,7 @@ function rangeSize(body: string): number {
 
 /**
  * Why an ignore pattern is rejected, or `undefined` when it is safe to pass to
- * fast-glob. Reads the pattern once, without recursion, and counts an upper
+ * the glob. Reads the pattern once, without recursion, and counts an upper
  * bound of its brace expansions, so the check itself cannot be exhausted.
  */
 export function unsafeIgnorePatternReason(pattern: string): string | undefined {
@@ -93,7 +94,7 @@ export function unsafeIgnorePatternReason(pattern: string): string | undefined {
   return current > MAX_BRACE_EXPANSIONS ? tooMany : undefined
 }
 
-/** Throw when any ignore pattern is unsafe to pass to fast-glob. */
+/** Throw when any ignore pattern is unsafe to pass to the glob. */
 export function assertSafeIgnorePatterns(patterns: readonly string[]): void {
   for (const [index, pattern] of patterns.entries()) {
     const reason = unsafeIgnorePatternReason(pattern)

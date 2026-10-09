@@ -20,7 +20,8 @@ import { fingerprintIssue } from './baseline.js'
 import { checkBrokenReferences, extractFileReferences } from './checks/brokenReferences.js'
 import { parseGitignore, type GitignoreMatcher } from './gitignore.js'
 import { buildDelegationGraph, loadImportedFiles } from './delegation.js'
-import fg from 'fast-glob'
+import { glob } from 'tinyglobby'
+import { reportSymlinksWithoutFollowing } from '../fs/glob.js'
 import { checkFileSize, DEFAULT_MAX_FILE_BYTES } from './checks/fileSize.js'
 import {
   AGENT_CONFIG_FILES,
@@ -72,14 +73,16 @@ const BARE_NAME_PATTERNS = ['md', 'mdx', 'json', 'jsonc', 'yaml', 'yml', 'toml',
 function createNameLookup(repoPath: string): (name: string) => Promise<boolean> {
   let names: Promise<Set<string>> | null = null
   return async (name) => {
-    names ??= fg(BARE_NAME_PATTERNS, {
+    names ??= glob(BARE_NAME_PATTERNS, {
       cwd: repoPath,
       dot: true,
       onlyFiles: false,
-      followSymbolicLinks: false,
-      suppressErrors: true,
+      followSymbolicLinks: true,
+      fs: reportSymlinksWithoutFollowing,
+      expandDirectories: false,
       caseSensitiveMatch: false,
-      deep: 12,
+      // Twelve levels, counting the top level as depth 0.
+      deep: 11,
       ignore: ['**/node_modules/**', '**/.git/**'],
     }).then((matches) => new Set(matches.map((match) => path.posix.basename(match))))
     return (await names).has(name)

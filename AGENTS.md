@@ -25,7 +25,7 @@ for quality, safety, contradictions, and stale commands. It is **not** an AI pro
 
 - TypeScript, ESM, Node.js ≥ 18
 - pnpm
-- `commander`, `fast-glob`, `zod`, `picocolors`
+- `commander`, `tinyglobby`, `zod`, `picocolors`
 - `vitest` for tests, `tsx` for dev, `prettier` for formatting
 
 ## Commands to run before finishing
