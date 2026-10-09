@@ -1,8 +1,8 @@
 import type { ContextIssue } from '../../types.js'
 import type { PackageJsonScripts } from '../../fs/readPackageJson.js'
 import { getLineEvidence } from '../evidence.js'
-
-type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun'
+import { isNegated } from '../negation.js'
+import type { ExpectedPackageManager, PackageManager } from '../packageManager.js'
 
 // Package-manager commands that are not package.json scripts.
 const BUILTINS: Record<PackageManager, ReadonlySet<string>> = {
@@ -179,6 +179,136 @@ export function checkCommandAlignment(
       message: `Instruction references missing package script: "${cmd.script}"`,
       recommendation: `Update the instruction file or add package.json script "${cmd.script}".`,
     }))
+}
+
+// Commands that install or change dependencies, and so write a lockfile.
+const INSTALLS: Record<PackageManager, ReadonlySet<string>> = {
+  pnpm: new Set(
+    'add i install remove rm uninstall un update up upgrade dedupe import link ln unlink prune rebuild rb fetch'.split(
+      ' ',
+    ),
+  ),
+  npm: new Set(
+    'i install ci add remove rm uninstall un update up upgrade dedupe link unlink prune rebuild'.split(
+      ' ',
+    ),
+  ),
+  yarn: new Set('add i install remove upgrade up dedupe import link unlink'.split(' ')),
+  bun: new Set('i install add a remove rm update link unlink'.split(' ')),
+}
+
+// Text just before a command that offers it as an alternative or names it
+// only to rule it out: "instead of `npm install`", "(not `yarn`)", "or `npm test`".
+const ALTERNATIVE_BEFORE =
+  /(?:\binstead\s+of|\brather\s+than|\bunlike|\bnot|\bvs\.?|\bversus|\bover|\bfrom|\bor|\be\.g\.|\bsuch\s+as)\s*[`'"(]*\s*$/i
+
+const MAX_ALTERNATIVE_CONTEXT = 40
+
+// Bounds that keep the work per line linear on hostile input: only the first
+// matches on a line are examined, and negation is judged from a window
+// before each match rather than everything before it.
+const MAX_INVOCATIONS_PER_LINE = 64
+const MAX_NEGATION_CONTEXT = 200
+
+export type PackageManagerInvocation = {
+  manager: PackageManager
+  raw: string
+  line: number
+}
+
+// A clause scoped to another manager: "If you use yarn, run `yarn install`".
+function scopedToManager(line: string, pm: PackageManager): boolean {
+  return new RegExp(
+    `\\bif\\s+you(?:'re|\\s+are)?\\s+(?:use|using|prefer)\\s+${pm}\\b|\\b(?:for|with)\\s+${pm}(?:\\s+users)?\\s*[:,]`,
+    'i',
+  ).test(line)
+}
+
+/**
+ * Package-manager invocations that commit to a manager: installs and script
+ * runs. Version specs (`pnpm@9.12.0`), global installs, registry and one-off
+ * commands (`npm publish`, `pnpm dlx`), negated or alternative mentions, and
+ * prose are skipped. At most one invocation per manager and line.
+ */
+export function extractPackageManagerInvocations(content: string): PackageManagerInvocation[] {
+  const results: PackageManagerInvocation[] = []
+
+  content.split('\n').forEach((line, idx) => {
+    const seen = new Set<PackageManager>()
+    const scoped = new Map<PackageManager, boolean>()
+    let examined = 0
+    for (const match of line.matchAll(/(?<![\w@./-])(pnpm|npm|yarn|bun)(?=[ \t])/g)) {
+      if (++examined > MAX_INVOCATIONS_PER_LINE) break
+      const pm = match[1] as PackageManager
+      if (seen.has(pm)) continue
+      const tokens = commandSegment(line.slice(match.index + match[0].length))
+      const parsed = parseInvocation(tokens)
+      if (!parsed) continue
+      const { command, viaRun } = parsed
+      if (!TOKEN.test(command) || command === 'global') continue
+      if (tokens.some((t) => t === '-g' || t === '--global')) continue
+
+      const commits =
+        INSTALLS[pm].has(command) ||
+        viaRun ||
+        (!BUILTINS[pm].has(command) &&
+          !VERSION.test(command) &&
+          !PROSE_WORDS.has(command.toLowerCase()) &&
+          (pm !== 'npm' || NPM_SHORTHAND_SCRIPTS.has(command)))
+      if (!commits) continue
+
+      const before = line.slice(Math.max(0, match.index - MAX_ALTERNATIVE_CONTEXT), match.index)
+      if (ALTERNATIVE_BEFORE.test(before)) continue
+      const window = line.slice(Math.max(0, match.index - MAX_NEGATION_CONTEXT), match.index)
+      if (isNegated(window, window.length)) continue
+      if (!scoped.has(pm)) scoped.set(pm, scopedToManager(line, pm))
+      if (scoped.get(pm)) continue
+
+      seen.add(pm)
+      results.push({ manager: pm, raw: `${pm} ${tokens.join(' ')}`.trim(), line: idx + 1 })
+    }
+  })
+
+  return results
+}
+
+const MAX_LISTED_LINES = 10
+
+/**
+ * One issue per file and package manager the repository does not use,
+ * anchored at its first use, so a block of `npm run` lines in a pnpm
+ * repository is one mistake to fix rather than one per line.
+ */
+export function checkPackageManagerAlignment(
+  filePath: string,
+  content: string,
+  expected: ExpectedPackageManager | null,
+): ContextIssue[] {
+  if (expected === null) return []
+  const linesByManager = new Map<PackageManager, number[]>()
+  for (const cmd of extractPackageManagerInvocations(content)) {
+    if (cmd.manager === expected.manager) continue
+    linesByManager.set(cmd.manager, [...(linesByManager.get(cmd.manager) ?? []), cmd.line])
+  }
+
+  return [...linesByManager].map(([manager, lines]) => {
+    const listed = lines.slice(0, MAX_LISTED_LINES).join(', ')
+    const more =
+      lines.length > MAX_LISTED_LINES ? ` and ${lines.length - MAX_LISTED_LINES} more` : ''
+    const where = lines.length > 1 ? ` on lines ${listed}${more}` : ''
+    return {
+      id: `command-alignment-pm-${filePath}-${manager}`,
+      severity: 'medium' as const,
+      category: 'command-alignment',
+      file: filePath,
+      line: lines[0],
+      evidence: getLineEvidence(content, lines[0]),
+      message: `Instruction uses ${manager}, but this repository uses ${expected.manager}`,
+      recommendation:
+        `Use ${expected.manager} commands instead of ${manager}${where} (${expected.evidence.join(', ')}). ` +
+        `Running ${manager} here can write a second lockfile and install different dependency versions.`,
+    }
+  })
 }
 
 export function checkCommandsWithoutPackageJson(filePath: string, content: string): ContextIssue[] {
