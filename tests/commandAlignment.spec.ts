@@ -334,6 +334,24 @@ describe('make targets', () => {
     expect([...parseMakeTargets(makefile)].sort()).toEqual(['build', 'lint', 'test'])
   })
 
+  it('parses double-colon rules, indented rules, and skips :: assignments', () => {
+    const makefile = [
+      'clean:: tidy',
+      '  docs : README.md',
+      'LIST ::= a b',
+      'FLAGS != echo -O2',
+      'out/bin\tdist/app:',
+    ].join('\n')
+    expect([...parseMakeTargets(makefile)].sort()).toEqual(['clean', 'dist/app', 'docs', 'out/bin'])
+  })
+
+  it('parses a 1 MB line of blanks without a colon in linear time', () => {
+    const line = `a${' '.repeat(1024 * 1024)}x`
+    const start = performance.now()
+    expect(parseMakeTargets(`${line}\nbuild:\n`)).toEqual(new Set(['build']))
+    expect(performance.now() - start).toBeLessThan(500)
+  })
+
   it('flags missing targets and a missing Makefile', () => {
     const content = 'Run `make ship`.'
     expect(checkMakeTargets('AGENTS.md', content, new Set(['build']))[0].message).toContain(

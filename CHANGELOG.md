@@ -15,6 +15,9 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 ### Security
 
 - `rules.ignoreFiles` patterns from `.acdrc` are now bounded before they reach `fast-glob`. A pattern that nests braces more than 10 levels deep or expands to more than 1,000 patterns fails validation as a config error. Before, a deeply nested pattern well under the 10,000-character limit in `braces` could exhaust the stack (GHSA-vfj7-8cjw-p6xm, no patched `braces` release), and a short run of sibling groups such as `{a,b}{a,b}…` could expand to millions of patterns and exhaust memory. Existing brace patterns keep working.
+- Makefile target parsing no longer takes quadratic time on a line of blanks that ends without a colon. A 1 MB line such as `a`, a million spaces, and `x` took minutes to parse; it now takes milliseconds. Targets parsed from ordinary Makefiles are unchanged, except that `NAME ::= value` assignments are no longer read as a `NAME` target.
+- `package.json` and the root Makefile (`GNUmakefile`, `makefile`, `Makefile`) are no longer read through a symlink that resolves outside the repository. A linked file outside is treated as missing, the same as other files the audit reads.
+- `broken-references` no longer follows symlinks out of the repository when it checks whether a referenced path exists. With `link -> /home/runner`, a reference to `./link/.ssh/config` was reported as present or missing depending on files outside the repository; a path now counts as present only when its real path is inside the repository.
 
 ### Changed
 

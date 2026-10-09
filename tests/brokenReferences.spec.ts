@@ -266,4 +266,25 @@ describe('auditRepo broken references', () => {
       }
     })
   })
+
+  describe('symlinked directories', () => {
+    it('does not count a path through a symlink that leaves the repository', async () => {
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+      try {
+        await fs.writeFile(path.join(outside, 'secret.md'), 'outside')
+        await fs.symlink(outside, path.join(tmpDir, 'link'))
+        await write('AGENTS.md', 'See `./link/secret.md`.')
+        expect((await refIssues()).map((i) => i.line)).toEqual([1])
+      } finally {
+        await fs.rm(outside, { recursive: true, force: true })
+      }
+    })
+
+    it('counts a path through a symlink that stays inside the repository', async () => {
+      await write('docs/guide.md', 'guide')
+      await fs.symlink(path.join(tmpDir, 'docs'), path.join(tmpDir, 'link'))
+      await write('AGENTS.md', 'See `./link/guide.md`.')
+      expect(await refIssues()).toEqual([])
+    })
+  })
 })

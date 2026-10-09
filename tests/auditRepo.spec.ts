@@ -171,6 +171,22 @@ Include: files changed, commands run, tests passed, known limitations.
     expect(result.issues.map((i) => i.category)).toEqual(['file-size'])
     expect(result.issues[0].severity).toBe('medium')
   })
+
+  it('does not read a Makefile that links outside the repository', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(path.join(outside, 'Makefile'), 'ship:\n\techo outside\n')
+      await fs.symlink(path.join(outside, 'Makefile'), path.join(tmpDir, 'Makefile'))
+      await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), 'Run `make ship`.\n')
+      const result = await auditRepo(tmpDir)
+      const messages = result.issues
+        .filter((i) => i.category === 'command-alignment')
+        .map((i) => i.message)
+      expect(messages).toEqual(['Instruction references make targets but no Makefile was found'])
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('auditRepo structural checks across related files', () => {
