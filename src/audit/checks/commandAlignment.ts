@@ -62,6 +62,10 @@ const PROSE_WORDS = new Set(
 
 const TOKEN = /^[\w:.@/-]+$/
 
+// A version after a package manager's name ("pnpm 11", "npm v10.x") is prose
+// about which release to use, not a script.
+const VERSION = /^v?\d+(?:\.(?:\d+|x))*$/i
+
 export type ExtractedCommand = {
   script: string
   raw: string
@@ -137,7 +141,7 @@ export function extractCommands(content: string): ExtractedCommand[] {
       const { command, viaRun } = parsed
       if (!TOKEN.test(command) || PROSE_WORDS.has(command.toLowerCase())) continue
       if (!viaRun) {
-        if (BUILTINS[pm].has(command)) continue
+        if (BUILTINS[pm].has(command) || VERSION.test(command)) continue
         if (pm === 'npm' && !NPM_SHORTHAND_SCRIPTS.has(command)) continue
       }
 

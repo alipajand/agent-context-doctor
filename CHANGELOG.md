@@ -8,6 +8,11 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- A repository with no agent context files now scores 0 (`risky`). It used to score 80 (`good`), because the missing-files issue was deducted like any other high issue.
+- `command-alignment` no longer reads a version after a package manager's name (`pnpm 11`, `npm v10.x`) as a missing script.
+
 ## [1.0.0] — 2026-09-24
 
 ### Added

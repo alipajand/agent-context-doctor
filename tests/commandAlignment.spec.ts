@@ -101,6 +101,12 @@ describe('extractCommands', () => {
     expect(cmds.some((c) => c.script === 'test')).toBe(true)
   })
 
+  it('does not read a version after the package manager as a script', () => {
+    const cmds = extractCommands('Node 24 or later and pnpm 11, or npm v10.x.')
+    expect(cmds).toEqual([])
+    expect(extractCommands('pnpm run 11').map((c) => c.script)).toEqual(['11'])
+  })
+
   it('skips bun add as a package-manager sub-command', () => {
     const cmds = extractCommands('Run bun add lodash first')
     expect(cmds.some((c) => c.script === 'add')).toBe(false)
