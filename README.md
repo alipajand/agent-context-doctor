@@ -35,7 +35,7 @@ Agent configuration carries the same risk with higher stakes. A committed `bypas
 | **Safety boundaries** | Whether primary files include ask-before / forbidden-change language for auth, billing, database, and production |
 | **Validation commands** | Whether instructions tell agents to run tests, lint, or typecheck |
 | **Final reporting** | Whether instructions describe what to include in a final summary |
-| **Command alignment** | `pnpm`/`npm`/`yarn`/`bun` scripts and `make` targets referenced in instructions that don't exist. Built-in commands, workspace-targeted runs (`--filter`, `-C`, `workspace`), and prose ("use pnpm for everything") are ignored |
+| **Command alignment** | `pnpm`/`npm`/`yarn`/`bun` scripts and `make` targets referenced in instructions that don't exist. Built-in commands, workspace-targeted runs (`--filter`, `-C`, `workspace`), and prose ("use pnpm for everything") are ignored. Also installs and script runs for a package manager the repository does not use (`yarn test` when `package.json` declares `"packageManager": "pnpm@9.12.0"` or the only lockfile is `pnpm-lock.yaml`), once per file and manager. Nothing is reported when the evidence is missing or conflicting, for global installs and registry commands (`npm install -g`, `npm publish`, `npx`), or when the command is negated or offered as an alternative ("instead of `npm install`", "if you use yarn") |
 | **Broken references** | Markdown links, inline-code paths (`docs/ARCHITECTURE.md`), and `@imports` that point at files that no longer exist |
 | **Contradictions** | Conflicting directives across two or more files |
 | **Frontmatter** | Tool rule files that are silently ignored: Cursor `.mdc` rules with no `alwaysApply: true`, `globs`, or `description` (or no frontmatter), Claude subagents and skills without `name` and `description`, Copilot `.instructions.md` without `applyTo`, and unclosed frontmatter |
@@ -368,6 +368,7 @@ Issues are matched by category, file, message, and evidence rather than line num
 
 - Structural checks (`safety-boundaries`, `validation-commands`, `final-reporting`) match against the whole file, so they report file-level issues with no line number.
 - Files where agents legitimately can't run `pnpm test` locally (e.g. a Copilot file used only in CI) will still be flagged by `validation-commands`. Suppress it with `disabledChecks` or a per-file comment once confirmed.
+- The expected package manager comes from the root `package.json` and root lockfiles. Instruction files inside a nested project with its own lockfile or `packageManager` are not checked against it, and a bare `yarn` (yarn's install shorthand) is not recognised as an install.
 - Only text files matching the known patterns above are read. Binary and generated files are skipped.
 - Symlinked directories are not followed, so instruction files that live behind a directory symlink are not detected. Link the files themselves instead.
 - `broken-references` reads only the root `.gitignore`; nested `.gitignore` files, `.git/info/exclude`, and global excludes are not consulted. Delegation follows references to context files and `@imports`, not plain Markdown links to other documentation.

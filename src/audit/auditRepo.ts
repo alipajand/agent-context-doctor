@@ -9,6 +9,7 @@ import {
   checkCommandAlignment,
   checkCommandsWithoutPackageJson,
   checkMakeTargets,
+  checkPackageManagerAlignment,
   parseMakeTargets,
 } from './checks/commandAlignment.js'
 import { checkContradictions } from './checks/contradictions.js'
@@ -28,6 +29,7 @@ import {
 } from './checks/agentConfig.js'
 import { checkClaudeArtifact, checkClaudeScript } from './checks/claudeArtifacts.js'
 import { checkFrontmatter } from './checks/frontmatter.js'
+import { createPackageManagerLookup } from './packageManager.js'
 import { isWithin } from '../fs/safePath.js'
 import fs from 'node:fs/promises'
 import { computeScore } from './score.js'
@@ -183,6 +185,8 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
   const contextFiles = await detectContextFiles(absoluteRepo, opts.ignoreFiles ?? [])
   const packageScripts = await readPackageScripts(absoluteRepo)
   const makeTargets = await readMakeTargets(absoluteRepo)
+  const packageManagers =
+    packageScripts === null ? null : await createPackageManagerLookup(absoluteRepo)
 
   const issues: ContextIssue[] = []
 
@@ -304,6 +308,8 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
           return !scriptMatch || !allowedScripts.has(scriptMatch[1])
         })
         fileIssues.push(...cmdIssues)
+        const expected = (await packageManagers?.expectedFor(filePath)) ?? null
+        fileIssues.push(...checkPackageManagerAlignment(filePath, content, expected))
       } else {
         fileIssues.push(...checkCommandsWithoutPackageJson(filePath, content))
       }

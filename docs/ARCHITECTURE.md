@@ -31,6 +31,7 @@ The tool has no runtime server, no database, no network dependencies, and no LLM
 | `src/fs/findFiles.ts` | `fast-glob`-backed file discovery for context files |
 | `src/fs/readTextFile.ts` | Size- and type-guarded UTF-8 reader with byte counting |
 | `src/fs/readPackageJson.ts` | Reads `package.json` scripts for command-alignment checks |
+| `src/audit/packageManager.ts` | Expected package manager from `packageManager` and lockfiles (null when missing or conflicting); nested projects with their own lockfile are left alone |
 | `src/fs/writeReport.ts` | Writes Markdown report to disk; refuses to follow a symlink at the target |
 | `src/fs/resolveOutputPath.ts` | Confines report paths to the audited repo unless `--allow-outside` is passed |
 | `src/fs/safePath.ts` | Lexical and symlink-aware path containment helpers |
@@ -48,6 +49,7 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkPlaceholderContent` | `placeholderContent.ts` | TODO/TBD markers, lorem ipsum, blank template sections |
 | `checkRiskyLanguage` | `riskyLanguage.ts` | High-risk directives (skip tests, commit secrets) and medium-risk ones (make product decisions) |
 | `checkCommandAlignment` | `commandAlignment.ts` | Commands referenced in instruction files that are missing from `package.json` scripts |
+| `checkPackageManagerAlignment` | `commandAlignment.ts` | Installs and script runs for a package manager other than the one `packageManager` and the lockfiles establish |
 | `checkSafetyBoundaries` | `safetyBoundaries.ts` | Primary files lacking "ask before / do not change / forbidden" language |
 | `checkValidationCommands` | `validationCommands.ts` | Primary files that don't mention test/lint/typecheck/build or a known validation tool (`pytest`, `ruff`, `mypy`, `go vet`, `cargo clippy`, `make check`, …) |
 | `checkFinalReporting` | `finalReporting.ts` | Primary files without final-report guidance (files changed, commands run, etc.) |

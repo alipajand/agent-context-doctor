@@ -8,6 +8,10 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- `command-alignment` reports installs and script runs for a package manager the repository does not use, such as `yarn install` and `yarn test` when `package.json` declares `"packageManager": "pnpm@9.12.0"` and the only lockfile is `pnpm-lock.yaml`. The expected manager comes from `packageManager` and the root lockfiles; nothing is reported when they are missing or disagree, for nested projects with their own lockfile, for global installs, registry and one-off commands, or when the command is negated or offered as an alternative. One medium issue per file and manager ([#63](https://github.com/alipajand/agent-context-doctor/issues/63)).
+
 ### Security
 
 - `rules.ignoreFiles` patterns from `.acdrc` are now bounded before they reach `fast-glob`. A pattern that nests braces more than 10 levels deep or expands to more than 1,000 patterns fails validation as a config error. Before, a deeply nested pattern well under the 10,000-character limit in `braces` could exhaust the stack (GHSA-vfj7-8cjw-p6xm, no patched `braces` release), and a short run of sibling groups such as `{a,b}{a,b}…` could expand to millions of patterns and exhaust memory. Existing brace patterns keep working.
