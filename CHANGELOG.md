@@ -14,6 +14,8 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ### Fixed
 
+- `final-reporting` accepts reporting guidance in ordinary words: two report fields such as "the files you changed" and "the commands you ran", a `## Reporting` (or `## When you are done`, `## Summary of changes`) section that asks for at least one of them, or one field requested for the final message. An empty `## Reporting` heading still counts as missing guidance ([#59](https://github.com/alipajand/agent-context-doctor/issues/59)).
+- `validation-commands` recognises Python, Go, Rust, make, and JVM validation commands (`pytest`, `unittest`, `ruff`, `mypy`, `pyright`, `flake8`, `tox`, `go vet`, `golangci-lint`, `cargo check`/`clippy`/`fmt`/`nextest`, `make check`, `mvn verify`, `gradle check`). Commands such as `go run` or `make install` still do not count ([#60](https://github.com/alipajand/agent-context-doctor/issues/60)).
 - A repository with no agent context files now scores 0 (`risky`). It used to score 80 (`good`), because the missing-files issue was deducted like any other high issue.
 - `command-alignment` no longer reads a version after a package manager's name (`pnpm 11`, `npm v10.x`, `pnpm@9.12.0`) as a missing script.
 

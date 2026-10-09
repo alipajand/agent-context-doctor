@@ -79,4 +79,124 @@ describe('checkFinalReporting', () => {
   it('generated acd init template satisfies final reporting', () => {
     expect(checkFinalReporting('AGENTS.md', AGENTS_TEMPLATE)).toHaveLength(0)
   })
+
+  describe('reporting guidance in ordinary language (#59)', () => {
+    it('passes the issue #59 reproduction: a "## Reporting" section in plain words', () => {
+      const content = [
+        '# AGENTS',
+        '',
+        'Run `npm test` before you finish. Ask before adding dependencies; never commit to main.',
+        '',
+        '## Reporting',
+        '',
+        'When you finish, list the files you changed, the commands you ran and their results, and anything left undone.',
+      ].join('\n')
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
+    })
+
+    it.each([
+      'List the files you changed and the commands you ran.',
+      'Summarize which files you modified and the tests you ran.',
+      'Mention the commands you executed and anything left unfinished.',
+      'Report the changed files and any open questions.',
+      'Include the test results and any follow-ups.',
+    ])('passes two report fields in other words: %s', (content) => {
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
+    })
+
+    it.each(['## Reporting', '### Report back', '## When you are done', '## Summary of changes'])(
+      'passes a "%s" heading whose section names a report field',
+      (heading) => {
+        const content = `${heading}\n\nList the files you changed.\n\n## Other\n\nBe concise.`
+        expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
+      },
+    )
+
+    it('passes one field when the line asks for it in the final message', () => {
+      const content = 'In your final message, list the files you changed.'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
+    })
+
+    it('flags an empty "## Reporting" heading', () => {
+      const content = '# AGENTS\n\n## Reporting\n\n## Testing\n\nRun the tests.'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('flags a "## Reporting" heading whose section asks for nothing to report', () => {
+      const content = '## Reporting\n\nBe brief and friendly.\n'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('does not take a field under a later section for the reporting heading', () => {
+      const content = '## Reporting\n\nBe brief.\n\n## Changes\n\nList the files you changed.'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('does not treat a "Reporting bugs" heading as final-report guidance', () => {
+      const content = '## Reporting bugs\n\nOpen an issue with the files you changed.'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('does not add up report-like words from unrelated paragraphs', () => {
+      const content = [
+        '# Project notes',
+        '',
+        'Decisions waiting on the owner are on the open questions page.',
+        '',
+        'The follow-ups feature reminds advisors to call clients back.',
+        '',
+        'The anything-left-undone list lives in the tracker.',
+      ].join('\n')
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('does not count a project term such as "open questions" or "follow-ups" as a field', () => {
+      const content =
+        'See the open questions page and the follow-ups feature for the files you changed.'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('accepts fields listed over several lines of one paragraph', () => {
+      const content = 'Report:\n- the files you changed\n- the commands you ran'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
+    })
+
+    it('handles long runs of # and whitespace in linear time', () => {
+      const start = Date.now()
+      checkFinalReporting('AGENTS.md', '#'.repeat(1_000_000))
+      checkFinalReporting('AGENTS.md', `files${' '.repeat(1_000_000)}x`)
+      checkFinalReporting('AGENTS.md', `\n${' '.repeat(1_000_000)}x`)
+      checkFinalReporting('AGENTS.md', '## Reporting\n'.repeat(80_000))
+      expect(Date.now() - start).toBeLessThan(5_000)
+    })
+
+    it('still accepts an indented or tightly written final report heading', () => {
+      expect(checkFinalReporting('AGENTS.md', '   ## Final report\nDone.')).toHaveLength(0)
+      expect(checkFinalReporting('AGENTS.md', 'Intro.\n###Handoff notes')).toHaveLength(0)
+    })
+
+    it('does not treat a hash in the middle of a line as a final report heading', () => {
+      expect(checkFinalReporting('AGENTS.md', 'Write the C# final report generator.')).toHaveLength(
+        1,
+      )
+    })
+
+    it('handles a heading padded with spaces in linear time', () => {
+      const start = Date.now()
+      checkFinalReporting('AGENTS.md', `## Reporting${' '.repeat(200_000)}x\n`)
+      checkFinalReporting('AGENTS.md', `## Reporting:${' '.repeat(200_000)}x\n`)
+      expect(Date.now() - start).toBeLessThan(5_000)
+    })
+
+    it('accepts a reporting heading with a trailing colon', () => {
+      expect(
+        checkFinalReporting('AGENTS.md', '## Reporting:\n\nList the files you changed.'),
+      ).toHaveLength(0)
+    })
+
+    it('flags a single report field without a final-report anchor', () => {
+      const content = 'Keep a list of the files you changed.'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+  })
 })
