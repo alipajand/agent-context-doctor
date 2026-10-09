@@ -47,7 +47,7 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkRiskyLanguage` | `riskyLanguage.ts` | High-risk directives (skip tests, commit secrets) and medium-risk ones (make product decisions) |
 | `checkCommandAlignment` | `commandAlignment.ts` | Commands referenced in instruction files that are missing from `package.json` scripts |
 | `checkSafetyBoundaries` | `safetyBoundaries.ts` | Primary files lacking "ask before / do not change / forbidden" language |
-| `checkValidationCommands` | `validationCommands.ts` | Primary files that don't mention test/lint/typecheck/build |
+| `checkValidationCommands` | `validationCommands.ts` | Primary files that don't mention test/lint/typecheck/build or a known validation tool (`pytest`, `ruff`, `mypy`, `go vet`, `cargo clippy`, `make check`, …) |
 | `checkFinalReporting` | `finalReporting.ts` | Primary files without final-report guidance (files changed, commands run, etc.) |
 | `checkContradictions` | `contradictions.ts` | Cross-file directives that contradict each other (always run tests vs. skip tests) |
 | `checkHiddenCharacters` | `hiddenCharacters.ts` | Invisible Unicode (tag characters, bidi controls, zero-width characters) that can hide instructions; decodes tag-character text |
