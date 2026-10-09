@@ -1,7 +1,7 @@
 # agent-context-doctor
 
 [![version](https://img.shields.io/github/v/release/alipajand/agent-context-doctor?label=version&color=blue)](https://github.com/alipajand/agent-context-doctor/releases)
-[![tests](https://img.shields.io/badge/tests-682%20passing-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-696%20passing-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
 [![CI](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/alipajand/agent-context-doctor/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/alipajand/agent-context-doctor/actions/workflows/codeql.yml)
@@ -252,7 +252,7 @@ Add an optional `.acdrc` file at the repo root to set defaults without changing 
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. |
+| `ignoreFiles` | `string[]` | Glob patterns (relative to repo root) of context files to skip entirely. Brace patterns such as `{docs,notes}/**` work; a pattern that nests braces more than 10 levels deep or expands to more than 1,000 patterns fails validation. |
 | `disabledChecks` | `string[]` | Checks to disable: `placeholder-content`, `safety-boundaries`, `validation-commands`, `final-reporting`, `risky-language`, `command-alignment`, `contradictions`, `hidden-characters`, `secrets`, `broken-references`, `file-size`, `agent-config`, `frontmatter`. Unknown values fail validation. Run `acd checks` to list them with descriptions. |
 | `allowedMissingScripts` | `string[]` | Script names allowed to be absent from `package.json` without raising a `command-alignment` issue. |
 | `maxFileBytes` | `number` | Size budget for primary instruction files (default `40000`). Larger files get a low `file-size` issue. |

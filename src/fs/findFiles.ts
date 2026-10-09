@@ -1,5 +1,6 @@
 import fg from 'fast-glob'
 import path from 'node:path'
+import { assertSafeIgnorePatterns } from '../config/ignorePatterns.js'
 
 export const CONTEXT_PATTERNS = [
   // Cross-tool and model-specific root files, plus nested copies in monorepos
@@ -92,6 +93,9 @@ export async function findContextFiles(
   repoPath: string,
   extraIgnore: string[] = [],
 ): Promise<string[]> {
+  // `extraIgnore` comes from the audited repository's `.acdrc`. The schema
+  // already rejects unsafe patterns; this covers callers of the library API.
+  assertSafeIgnorePatterns(extraIgnore)
   const ignore = [...IGNORE_DIRS, ...extraIgnore]
 
   const entries = await fg(CONTEXT_PATTERNS, {
