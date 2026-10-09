@@ -161,6 +161,19 @@ describe('checkFinalReporting', () => {
       expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
     })
 
+    it('handles a heading padded with spaces in linear time', () => {
+      const start = Date.now()
+      checkFinalReporting('AGENTS.md', `## Reporting${' '.repeat(200_000)}x\n`)
+      checkFinalReporting('AGENTS.md', `## Reporting:${' '.repeat(200_000)}x\n`)
+      expect(Date.now() - start).toBeLessThan(5_000)
+    })
+
+    it('accepts a reporting heading with a trailing colon', () => {
+      expect(
+        checkFinalReporting('AGENTS.md', '## Reporting:\n\nList the files you changed.'),
+      ).toHaveLength(0)
+    })
+
     it('flags a single report field without a final-report anchor', () => {
       const content = 'Keep a list of the files you changed.'
       expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)

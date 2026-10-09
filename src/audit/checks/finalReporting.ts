@@ -17,8 +17,10 @@ const STRONG_FIELD_PATTERNS = [
 // Generic headings ("## Reporting", "## When you are done") are only guidance
 // when their section asks for something to report, so an empty heading does
 // not count. The heading must be the whole title: "## Reporting bugs" is not.
+// The trailing `\s*(?::\s*)?` has one way to split spaces, so a heading padded
+// with spaces is matched in linear time.
 const REPORT_HEADING =
-  /^#{1,6}\s+(?:reporting|report(?:ing)?\s+back|what\s+to\s+report|(?:when|after)\s+you(?:'re|\s+are)?\s+(?:done|finished)|(?:when|after)\s+you\s+finish|summary\s+of\s+(?:your\s+)?(?:changes|work)|wrap(?:ping)?[\s-]up)\s*:?\s*$/i
+  /^#{1,6}\s+(?:reporting|report(?:ing)?\s+back|what\s+to\s+report|(?:when|after)\s+you(?:'re|\s+are)?\s+(?:done|finished)|(?:when|after)\s+you\s+finish|summary\s+of\s+(?:your\s+)?(?:changes|work)|wrap(?:ping)?[\s-]up)\s*(?::\s*)?$/i
 
 const HEADING = /^#{1,6}\s/
 
