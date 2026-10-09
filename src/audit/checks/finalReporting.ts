@@ -54,10 +54,17 @@ const REPORT_FIELDS: RegExp[][] = [
     /known\s+limitations/i,
     /\b(?:anything|everything|work|items?|tasks?)\s+(?:(?:that\s+)?(?:is|was|you)\s+)?(?:left\s+)?(?:undone|unfinished|incomplete|outstanding|not\s+done)\b/i,
     /\banything\s+(?:you\s+)?(?:skipped|left\s+out)\b/i,
-    /\bopen\s+(?:items|questions|issues|risks)\b/i,
+    // "Open questions" or "follow-ups" alone are often a project's own terms
+    // (an open questions page, a follow-ups feature), so they need a
+    // determiner that makes them items of the report.
+    /\b(?:any|remaining|unresolved)\s+open\s+(?:items|questions|issues|risks)\b/i,
     /\bremaining\s+(?:work|issues|risks|todos?)\b/i,
   ],
-  [/recommended\s+next\s+steps?/i, /\bnext\s+steps\b/i, /\bfollow[- ]?ups?\b/i],
+  [
+    /recommended\s+next\s+steps?/i,
+    /\b(?:suggested|recommended|any)\s+next\s+steps\b/i,
+    /\b(?:any|remaining|suggested)\s+follow[- ]?ups?\b/i,
+  ],
 ]
 
 // A single field is enough when the same line places it in the final message:
@@ -88,7 +95,9 @@ export function checkFinalReporting(filePath: string, content: string): ContextI
   const matchedFields = STRONG_FIELD_PATTERNS.filter((p) => p.test(content))
   if (matchedFields.length >= 2) return []
 
-  if (fieldCount(content) >= 2) return []
+  // Plain-word fields count when they are asked for together, in one
+  // paragraph, so terms scattered through a long file do not add up.
+  if (content.split(/\n\s*\n/).some((paragraph) => fieldCount(paragraph) >= 2)) return []
 
   const lines = content.split('\n')
   if (hasReportingSection(lines)) return []

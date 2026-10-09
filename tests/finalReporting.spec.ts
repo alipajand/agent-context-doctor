@@ -137,6 +137,30 @@ describe('checkFinalReporting', () => {
       expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
     })
 
+    it('does not add up report-like words from unrelated paragraphs', () => {
+      const content = [
+        '# Project notes',
+        '',
+        'Decisions waiting on the owner are on the open questions page.',
+        '',
+        'The follow-ups feature reminds advisors to call clients back.',
+        '',
+        'The anything-left-undone list lives in the tracker.',
+      ].join('\n')
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('does not count a project term such as "open questions" or "follow-ups" as a field', () => {
+      const content =
+        'See the open questions page and the follow-ups feature for the files you changed.'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
+    })
+
+    it('accepts fields listed over several lines of one paragraph', () => {
+      const content = 'Report:\n- the files you changed\n- the commands you ran'
+      expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
+    })
+
     it('flags a single report field without a final-report anchor', () => {
       const content = 'Keep a list of the files you changed.'
       expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(1)
