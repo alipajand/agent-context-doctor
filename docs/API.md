@@ -243,7 +243,7 @@ function toMarkdownReport(result: AuditResult): string
 
 ### `findContextFiles(repoPath, ignoreFiles?)`
 
-Globs for all known context file patterns under `repoPath`. Symlinked directories are not traversed; symlinked files are returned so callers can check where they point.
+Globs for all known context file patterns under `repoPath`. Symlinked directories are not traversed; symlinked files are returned so callers can check where they point. Throws when an `ignoreFiles` pattern nests braces more than 10 levels deep or expands to more than 1,000 patterns (see `src/config/ignorePatterns.ts`).
 
 ```ts
 async function findContextFiles(repoPath: string, ignoreFiles?: string[]): Promise<string[]>

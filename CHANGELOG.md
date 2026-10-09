@@ -8,6 +8,10 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 ## [Unreleased]
 
+### Security
+
+- `rules.ignoreFiles` patterns from `.acdrc` are now bounded before they reach `fast-glob`. A pattern that nests braces more than 10 levels deep or expands to more than 1,000 patterns fails validation as a config error. Before, a deeply nested pattern well under the 10,000-character limit in `braces` could exhaust the stack (GHSA-vfj7-8cjw-p6xm, no patched `braces` release), and a short run of sibling groups such as `{a,b}{a,b}…` could expand to millions of patterns and exhaust memory. Existing brace patterns keep working.
+
 ### Fixed
 
 - A repository with no agent context files now scores 0 (`risky`). It used to score 80 (`good`), because the missing-files issue was deducted like any other high issue.

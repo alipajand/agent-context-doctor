@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { unsafeIgnorePatternReason } from './ignorePatterns.js'
 
 export const VALID_CHECKS = [
   'placeholder-content',
@@ -33,7 +34,14 @@ export const AcdRcSchema = z.object({
     .optional(),
   rules: z
     .object({
-      ignoreFiles: z.array(z.string()).optional(),
+      ignoreFiles: z
+        .array(
+          z.string().superRefine((pattern, ctx) => {
+            const reason = unsafeIgnorePatternReason(pattern)
+            if (reason) ctx.addIssue({ code: 'custom', message: `pattern ${reason}` })
+          }),
+        )
+        .optional(),
       disabledChecks: z.array(z.enum(VALID_CHECKS)).optional(),
       allowedMissingScripts: z.array(z.string()).optional(),
       maxFileBytes: z.number().int().positive().optional(),
