@@ -1,5 +1,12 @@
 # agent-context-doctor
 
+[![version](https://img.shields.io/github/v/release/alipajand/agent-context-doctor?label=version&color=blue)](https://github.com/alipajand/agent-context-doctor/releases)
+[![tests](https://img.shields.io/badge/tests-679%20passing-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
+[![CI](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alipajand/agent-context-doctor/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/alipajand/agent-context-doctor/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/alipajand/agent-context-doctor/actions/workflows/codeql.yml)
+[![license](https://img.shields.io/github/license/alipajand/agent-context-doctor?color=blue)](LICENSE)
+
 `agent-context-doctor` checks whether your agent instruction files and agent settings are specific, safe, and usable. It catches placeholder content, risky language, contradictions, stale commands, missing validation guidance, pasted secrets, hidden Unicode, and risky Claude Code and MCP configuration before they steer an AI coding agent.
 
 ## What it is
