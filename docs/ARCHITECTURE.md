@@ -23,6 +23,8 @@ The tool has no runtime server, no database, no network dependencies, and no LLM
 | `src/audit/evidence.ts` | Extracts line-level evidence snippets for check findings |
 | `src/audit/negation.ts` | Detects negated directives ("Never skip tests") so safety guidance is not reported as risky |
 | `src/audit/suppressions.ts` | Parses `acd-disable` inline comments; filters suppressed issues |
+| `src/audit/skipValidation.ts` | Finds advice to skip tests in any wording, shared by `risky-language` and `contradictions` |
+| `src/audit/lineContext.ts` | One pass over a line (clauses, negations, sentences, quotes) so many matches are checked in linear time |
 | `src/config/loadConfig.ts` | Loads and validates `.acdrc` via Zod |
 | `src/config/schema.ts` | Zod schema for `.acdrc` (audit options, rule overrides) |
 | `src/report/terminalReport.ts` | Colored terminal output |
@@ -53,7 +55,7 @@ All checks are pure functions in `src/audit/checks/`. Each accepts a file path a
 | `checkSafetyBoundaries` | `safetyBoundaries.ts` | Primary files lacking "ask before / do not change / forbidden" language |
 | `checkValidationCommands` | `validationCommands.ts` | Primary files that don't mention test/lint/typecheck/build or a known validation tool (`pytest`, `ruff`, `mypy`, `go vet`, `cargo clippy`, `make check`, …) |
 | `checkFinalReporting` | `finalReporting.ts` | Primary files without final-report guidance (files changed, commands run, etc.) |
-| `checkContradictions` | `contradictions.ts` | Cross-file directives that contradict each other (always run tests vs. skip tests) |
+| `checkContradictions` | `contradictions.ts` | Cross-file directives that contradict each other (always run tests vs. skip tests, different package managers named in primary files) |
 | `checkHiddenCharacters` | `hiddenCharacters.ts` | Invisible Unicode (tag characters, bidi controls, zero-width characters) that can hide instructions; decodes tag-character text |
 | `checkSecrets` | `secrets.ts` | Credentials pasted into instruction files; evidence is redacted |
 | `checkBrokenReferences` | `brokenReferences.ts` | Links, inline-code paths, and `@imports` to files that do not exist (existence is resolved in `auditRepo`, never outside the repo) |
