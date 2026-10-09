@@ -17,6 +17,9 @@ import { checkHiddenCharacters } from './checks/hiddenCharacters.js'
 import { checkSecrets } from './checks/secrets.js'
 import { fingerprintIssue } from './baseline.js'
 import { checkBrokenReferences, extractFileReferences } from './checks/brokenReferences.js'
+import { parseGitignore, type GitignoreMatcher } from './gitignore.js'
+import { buildDelegationGraph, loadImportedFiles } from './delegation.js'
+import fg from 'fast-glob'
 import { checkFileSize, DEFAULT_MAX_FILE_BYTES } from './checks/fileSize.js'
 import {
   AGENT_CONFIG_FILES,
@@ -46,20 +49,57 @@ export type AuditOptions = {
 
 type LoadedFile = { path: string; kind: ContextFileKind; content: string }
 
+type ReferenceContext = {
+  gitignore: GitignoreMatcher
+  /** True when a file or directory with this exact name exists anywhere in the repository. */
+  nameExists: (name: string) => Promise<boolean>
+}
+
+// Extensions of the bare file names `broken-references` checks.
+const BARE_NAME_PATTERNS = ['md', 'mdx', 'json', 'jsonc', 'yaml', 'yml', 'toml', 'sh'].map(
+  (ext) => `**/*.${ext}`,
+)
+
+/**
+ * Lookup of bare file names (`RELEASING.md`) anywhere in the repository. The
+ * first lookup walks the tree once, like context-file discovery does, and
+ * later lookups use the collected names. Symlinked directories are not
+ * traversed, so the walk stays inside the repository.
+ */
+function createNameLookup(repoPath: string): (name: string) => Promise<boolean> {
+  let names: Promise<Set<string>> | null = null
+  return async (name) => {
+    names ??= fg(BARE_NAME_PATTERNS, {
+      cwd: repoPath,
+      dot: true,
+      onlyFiles: false,
+      followSymbolicLinks: false,
+      suppressErrors: true,
+      caseSensitiveMatch: false,
+      deep: 12,
+      ignore: ['**/node_modules/**', '**/.git/**'],
+    }).then((matches) => new Set(matches.map((match) => path.posix.basename(match))))
+    return (await names).has(name)
+  }
+}
+
 /**
  * References from `filePath` that resolve to nothing, trying the repository
  * root and then the file's own directory. Paths that would resolve outside
- * the repository are never probed.
+ * the repository are never probed. A missing directory that the root
+ * .gitignore matches is expected to be absent, and a bare file name counts as
+ * present when a file with that name exists anywhere in the repository.
  */
 async function findMissingReferences(
   repoPath: string,
   filePath: string,
   content: string,
+  context: ReferenceContext,
 ): Promise<Set<string>> {
   const missing = new Set<string>()
   const bases = [repoPath, path.resolve(repoPath, path.dirname(filePath))]
 
-  for (const { target } of extractFileReferences(content)) {
+  for (const { target, bare } of extractFileReferences(content)) {
     // ESM TypeScript imports name `.js` files whose source is `.ts`.
     const names = /\.[cm]?js$/.test(target)
       ? [target, target.replace(/\.([cm]?)js$/, '.$1ts'), target.replace(/\.js$/, '.tsx')]
@@ -81,7 +121,18 @@ async function findMissingReferences(
         break
       }
     }
-    if (!found) missing.add(target)
+    if (found) continue
+
+    if (
+      target.endsWith('/') &&
+      candidates.some((candidate) =>
+        context.gitignore.ignores(toPosix(path.relative(repoPath, candidate)), true),
+      )
+    ) {
+      continue
+    }
+    if (bare && (await context.nameExists(target))) continue
+    missing.add(target)
   }
   return missing
 }
@@ -105,41 +156,23 @@ async function readMakeTargets(repoPath: string): Promise<Set<string> | null> {
   return null
 }
 
+// Guidance a file delegates to is read up to this many characters in total,
+// which keeps the joined text far below the engine's string length limit.
+const MAX_STRUCTURAL_CHARS = 4 * 1024 * 1024
+
+function joinWithinBudget(contents: string[]): string {
+  const parts: string[] = []
+  let size = 0
+  for (const content of contents) {
+    if (size + content.length > MAX_STRUCTURAL_CHARS) continue
+    parts.push(content)
+    size += content.length + 1
+  }
+  return parts.join('\n')
+}
+
 function toPosix(p: string): string {
   return p.replace(/\\/g, '/')
-}
-
-/** True when `content` points at `target`, by repo path, `@path` import, or root file name. */
-function references(content: string, target: string): boolean {
-  const posix = toPosix(target)
-  if (content.includes(posix)) return true
-  return (
-    !posix.includes('/') &&
-    new RegExp(`(^|[\\s@(\\[\`'"/])${escapeRegExp(posix)}\\b`, 'i').test(content)
-  )
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-/**
- * Text the structural checks (safety, validation, final report) evaluate for a
- * primary file. Guidance often lives in one shared place: CLAUDE.md says
- * "Follow AGENTS.md", and a .cursor/rules set spreads it over several files.
- * A file therefore counts as covered by its own content, by context files it
- * references, and by other primary files for the same tool.
- */
-function structuralContext(filePath: string, files: LoadedFile[]): string {
-  const self = files.find((f) => f.path === filePath)
-  if (!self) return ''
-  const related = files.filter(
-    (f) =>
-      f.path !== filePath &&
-      (references(self.content, f.path) ||
-        (f.kind === self.kind && isPrimaryInstructionFile(f.path))),
-  )
-  return [self.content, ...related.map((f) => f.content)].join('\n')
 }
 
 export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Promise<AuditResult> {
@@ -176,6 +209,62 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
     fileContents.push({ path: ctxFile.path, kind: ctxFile.kind, content })
   }
 
+  const referenceContext: ReferenceContext = {
+    gitignore: parseGitignore(await readRepoFile(absoluteRepo, '.gitignore')),
+    nameExists: createNameLookup(absoluteRepo),
+  }
+
+  // Structural checks see a file together with everything it delegates to
+  // ("Follow AGENTS.md", `@docs/guide.md`), so a pointer file is not told to
+  // copy guidance it already inherits.
+  const { imported, imports } = await loadImportedFiles(fileContents, (rel) =>
+    readRepoFile(absoluteRepo, rel),
+  )
+  const instructionFiles = [...fileContents, ...imported]
+  const contentByPath = new Map(instructionFiles.map((f) => [f.path, f.content]))
+  const delegation = buildDelegationGraph(instructionFiles, imports)
+
+  const runStructuralChecks = (filePath: string, text: string): ContextIssue[] => [
+    ...(disabled.has('safety-boundaries') ? [] : checkSafetyBoundaries(filePath, text)),
+    ...(disabled.has('validation-commands') ? [] : checkValidationCommands(filePath, text)),
+    ...(disabled.has('final-reporting') ? [] : checkFinalReporting(filePath, text)),
+  ]
+
+  // Files with the same closure (every file in a rules directory) share one
+  // closure object and one evaluation, so the work grows with the number of
+  // distinct closures, not with the number of files times their combined size.
+  const gapsByClosure = new Map<ReadonlySet<string>, Set<string>>()
+  const structuralFindings = new Map<string, ContextIssue[]>()
+  for (const { path: filePath } of fileContents) {
+    if (!isPrimaryInstructionFile(filePath)) continue
+    const closure = delegation.closure(filePath)
+    let gaps = gapsByClosure.get(closure)
+    if (!gaps) {
+      const text = joinWithinBudget([...closure].map((p) => contentByPath.get(p) ?? ''))
+      gaps = new Set(runStructuralChecks(filePath, text).map((issue) => issue.category))
+      gapsByClosure.set(closure, gaps)
+    }
+    // Each structural check reports at most one file-level issue whose fields
+    // do not depend on the text, so empty text yields the issue for each gap.
+    const missing = gaps
+    structuralFindings.set(
+      filePath,
+      runStructuralChecks(filePath, '').filter((issue) => missing.has(issue.category)),
+    )
+  }
+
+  // A file that delegates to a primary file with the same gap leaves the
+  // finding to that file, the single source of truth, unless the target
+  // delegates back (a cycle), where every file in it keeps its finding.
+  const reportedByTarget = (filePath: string, category: string): boolean =>
+    delegation
+      .targets(filePath)
+      .some(
+        (target) =>
+          (structuralFindings.get(target) ?? []).some((i) => i.category === category) &&
+          !delegation.closure(target).has(filePath),
+      )
+
   for (const { path: filePath, content } of fileContents) {
     const fileIssues: ContextIssue[] = []
 
@@ -200,7 +289,7 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
     }
 
     if (!disabled.has('broken-references')) {
-      const missing = await findMissingReferences(absoluteRepo, filePath, content)
+      const missing = await findMissingReferences(absoluteRepo, filePath, content, referenceContext)
       fileIssues.push(...checkBrokenReferences(filePath, content, missing))
     }
 
@@ -227,16 +316,11 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
           ...checkFileSize(filePath, content, opts.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES),
         )
       }
-      const structural = structuralContext(filePath, fileContents)
-      if (!disabled.has('safety-boundaries')) {
-        fileIssues.push(...checkSafetyBoundaries(filePath, structural))
-      }
-      if (!disabled.has('validation-commands')) {
-        fileIssues.push(...checkValidationCommands(filePath, structural))
-      }
-      if (!disabled.has('final-reporting')) {
-        fileIssues.push(...checkFinalReporting(filePath, structural))
-      }
+      fileIssues.push(
+        ...(structuralFindings.get(filePath) ?? []).filter(
+          (issue) => !reportedByTarget(filePath, issue.category),
+        ),
+      )
     }
 
     issues.push(...filterSuppressedIssues(filePath, content, fileIssues))

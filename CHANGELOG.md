@@ -16,6 +16,9 @@ This project follows [Semantic Versioning](https://semver.org/) and the [Keep a 
 
 - A repository with no agent context files now scores 0 (`risky`). It used to score 80 (`good`), because the missing-files issue was deducted like any other high issue.
 - `command-alignment` no longer reads a version after a package manager's name (`pnpm 11`, `npm v10.x`, `pnpm@9.12.0`) as a missing script.
+- A `CLAUDE.md` that only delegates ("Follow AGENTS.md", `@AGENTS.md`) no longer repeats the `safety-boundaries`, `validation-commands`, or `final-reporting` issue of the file it points at; the issue is reported once, on the file that holds the guidance. Delegation is now followed through several files and through `@imports` of in-repository Markdown files, with cycles and paths outside the repository handled safely ([#61](https://github.com/alipajand/agent-context-doctor/issues/61)).
+- `broken-references` no longer reports paths described as ignored or excluded ("`.gitignore` excludes `.idea/`") or missing directories that the root `.gitignore` matches. Gitignored files used as ordinary references are still reported ([#62](https://github.com/alipajand/agent-context-doctor/issues/62)).
+- `broken-references` now checks root-level file names in inline code that have a documentation or config extension (`RELEASING.md`, `config.json`, `pyproject.toml`), unless a file with that name exists somewhere in the repository ([#66](https://github.com/alipajand/agent-context-doctor/issues/66)).
 
 ## [1.0.0] — 2026-09-24
 
