@@ -1,9 +1,12 @@
 import type { ContextIssue } from '../../types.js'
 
+// Markdown headings start a line (after up to three spaces) with one to six
+// `#`. Anchoring them also keeps a long run of `#` from being retried at every
+// position, which made the earlier unanchored `#+` patterns quadratic.
 const STRONG_SECTION_PATTERNS = [
-  /#+\s*final\s+report/i,
-  /#+\s*completion\s+report/i,
-  /#+\s*handoff/i,
+  /^[ \t]{0,3}#{1,6}[ \t]*final\s+report/im,
+  /^[ \t]{0,3}#{1,6}[ \t]*completion\s+report/im,
+  /^[ \t]{0,3}#{1,6}[ \t]*handoff/im,
 ]
 
 const STRONG_FIELD_PATTERNS = [

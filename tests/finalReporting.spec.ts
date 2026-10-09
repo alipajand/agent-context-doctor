@@ -161,6 +161,26 @@ describe('checkFinalReporting', () => {
       expect(checkFinalReporting('AGENTS.md', content)).toHaveLength(0)
     })
 
+    it('handles long runs of # and whitespace in linear time', () => {
+      const start = Date.now()
+      checkFinalReporting('AGENTS.md', '#'.repeat(1_000_000))
+      checkFinalReporting('AGENTS.md', `files${' '.repeat(1_000_000)}x`)
+      checkFinalReporting('AGENTS.md', `\n${' '.repeat(1_000_000)}x`)
+      checkFinalReporting('AGENTS.md', '## Reporting\n'.repeat(80_000))
+      expect(Date.now() - start).toBeLessThan(5_000)
+    })
+
+    it('still accepts an indented or tightly written final report heading', () => {
+      expect(checkFinalReporting('AGENTS.md', '   ## Final report\nDone.')).toHaveLength(0)
+      expect(checkFinalReporting('AGENTS.md', 'Intro.\n###Handoff notes')).toHaveLength(0)
+    })
+
+    it('does not treat a hash in the middle of a line as a final report heading', () => {
+      expect(checkFinalReporting('AGENTS.md', 'Write the C# final report generator.')).toHaveLength(
+        1,
+      )
+    })
+
     it('handles a heading padded with spaces in linear time', () => {
       const start = Date.now()
       checkFinalReporting('AGENTS.md', `## Reporting${' '.repeat(200_000)}x\n`)
