@@ -30,7 +30,7 @@ The tool has no runtime server, no database, no network dependencies, and no LLM
 | `src/report/terminalReport.ts` | Colored terminal output |
 | `src/report/jsonReport.ts` | JSON serialization of `AuditResult` |
 | `src/report/markdownReport.ts` | Markdown report writer |
-| `src/fs/findFiles.ts` | `fast-glob`-backed file discovery for context files |
+| `src/fs/findFiles.ts` | `tinyglobby`-backed file discovery for context files |
 | `src/fs/readTextFile.ts` | Size- and type-guarded UTF-8 reader with byte counting |
 | `src/fs/readPackageJson.ts` | Reads `package.json` scripts for command-alignment checks |
 | `src/audit/packageManager.ts` | Expected package manager from `packageManager` and lockfiles (null when missing or conflicting); nested projects with their own lockfile are left alone |

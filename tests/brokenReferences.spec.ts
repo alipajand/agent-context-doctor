@@ -180,6 +180,28 @@ describe('auditRepo broken references', () => {
       expect(await refIssues()).toEqual([])
     })
 
+    it('does not look for a bare name through a symlinked directory', async () => {
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+      try {
+        await fs.writeFile(path.join(outside, 'RELEASING.md'), 'outside')
+        await fs.symlink(outside, path.join(tmpDir, 'linked'))
+        await write('AGENTS.md', 'Release steps live in `RELEASING.md`.')
+        expect((await refIssues()).map((i) => i.line)).toEqual([1])
+      } finally {
+        await fs.rm(outside, { recursive: true, force: true })
+      }
+    })
+
+    it('accepts a bare name that is a symlinked file', async () => {
+      await write('docs/release-steps.md', 'steps')
+      await fs.symlink(
+        path.join(tmpDir, 'docs', 'release-steps.md'),
+        path.join(tmpDir, 'docs', 'RELEASING.md'),
+      )
+      await write('AGENTS.md', 'Release steps live in `RELEASING.md`.')
+      expect(await refIssues()).toEqual([])
+    })
+
     it('still ignores bare names inside fenced code blocks', async () => {
       await write('AGENTS.md', '```bash\ncat `RELEASING.md`\n```')
       expect(await refIssues()).toEqual([])

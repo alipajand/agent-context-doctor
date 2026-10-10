@@ -1,5 +1,6 @@
-import fg from 'fast-glob'
 import path from 'node:path'
+import { glob } from 'tinyglobby'
+import { reportSymlinksWithoutFollowing } from './glob.js'
 import { assertSafeIgnorePatterns } from '../config/ignorePatterns.js'
 
 export const CONTEXT_PATTERNS = [
@@ -98,23 +99,21 @@ export async function findContextFiles(
   assertSafeIgnorePatterns(extraIgnore)
   const ignore = [...IGNORE_DIRS, ...extraIgnore]
 
-  const entries = await fg(CONTEXT_PATTERNS, {
+  const entries = await glob(CONTEXT_PATTERNS, {
     cwd: repoPath,
     ignore,
     absolute: false,
     dot: true,
     caseSensitiveMatch: false,
-    followSymbolicLinks: false,
-    onlyFiles: false,
-    objectMode: true,
-    // A pattern such as `.clinerules/**/*.md` makes fast-glob scan
-    // `.clinerules` as a directory; when it is a file that can throw ENOTDIR.
-    suppressErrors: true,
+    followSymbolicLinks: true,
+    fs: reportSymlinksWithoutFollowing,
+    // Directories are left out; symlinks are reported as files.
+    onlyFiles: true,
+    expandDirectories: false,
   })
 
   return entries
-    .filter((entry) => !entry.dirent.isDirectory())
-    .filter((entry) => !isUnwantedNestedMatch(entry.path))
-    .map((entry) => path.resolve(repoPath, entry.path))
+    .filter((entry) => !isUnwantedNestedMatch(entry))
+    .map((entry) => path.resolve(repoPath, entry))
     .sort()
 }

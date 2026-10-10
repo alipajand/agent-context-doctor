@@ -77,6 +77,37 @@ describe('findContextFiles', () => {
     expect(files).toHaveLength(0)
   })
 
+  it('respects brace ignore patterns', async () => {
+    await fs.mkdir(path.join(tmpDir, 'apps', 'web'), { recursive: true })
+    await fs.mkdir(path.join(tmpDir, 'apps', 'api'), { recursive: true })
+    await fs.writeFile(path.join(tmpDir, 'apps', 'web', 'AGENTS.md'), '# W')
+    await fs.writeFile(path.join(tmpDir, 'apps', 'api', 'AGENTS.md'), '# A')
+    await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), '# Root')
+    const files = await findContextFiles(tmpDir, ['apps/{web,api}/**'])
+    expect(files.map((f) => path.relative(tmpDir, f))).toEqual(['AGENTS.md'])
+  })
+
+  it('finds .clinerules when it is a file, not a directory', async () => {
+    await fs.writeFile(path.join(tmpDir, '.clinerules'), '# Rules')
+    const files = await findContextFiles(tmpDir)
+    expect(files.map((f) => path.relative(tmpDir, f))).toEqual(['.clinerules'])
+  })
+
+  it('lists a symlinked context file without entering symlinked directories', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-outside-'))
+    try {
+      await fs.writeFile(path.join(tmpDir, 'AGENTS.md'), '# A')
+      await fs.symlink(path.join(tmpDir, 'AGENTS.md'), path.join(tmpDir, 'CLAUDE.md'))
+      await fs.mkdir(path.join(outside, 'rules'))
+      await fs.writeFile(path.join(outside, 'rules', 'style.md'), '# outside')
+      await fs.symlink(outside, path.join(tmpDir, '.cursor'))
+      const files = await findContextFiles(tmpDir)
+      expect(files.map((f) => path.relative(tmpDir, f))).toEqual(['AGENTS.md', 'CLAUDE.md'])
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
+
   it('returns an empty array when no context files exist', async () => {
     await fs.writeFile(path.join(tmpDir, 'README.md'), '# Readme')
     const files = await findContextFiles(tmpDir)
