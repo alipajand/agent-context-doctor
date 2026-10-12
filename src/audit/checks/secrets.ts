@@ -54,38 +54,58 @@ const SECRET_PATTERNS: SecretPattern[] = [
 
 // Values that are clearly documentation rather than real credentials.
 const PLACEHOLDER =
-  /example|sample|dummy|fake|placeholder|changeme|your[_-]|redacted|xxxx|\*{3}|<[^>]*>|\$\{|\$[A-Z_]|process\.env|environ|getenv|secrets\.|\{\{/i
+  /example|sample|dummy|fake|placeholder|changeme|your[_-]|redacted|xxxx|\*{3}|<[^<>]*>|\$\{|\$[A-Z_]|process\.env|environ|getenv|secrets\.|\{\{/i
 
-function redact(value: string): string {
+/** Mask a credential, keeping a short prefix so the finding can be located. */
+export function maskSecret(value: string): string {
   const visible = value.startsWith('-----') ? value.length : Math.min(4, value.length)
   return value.slice(0, visible) + '*'.repeat(Math.max(0, Math.min(value.length - visible, 12)))
+}
+
+type LineScan = { redacted: string; labels: string[]; severity: Severity | null }
+
+function scanLine(line: string): LineScan {
+  let redacted = line
+  const labels: string[] = []
+  let severity: Severity | null = null
+
+  for (const {
+    label,
+    pattern,
+    severity: patternSeverity,
+    group = 0,
+    looksReal,
+  } of SECRET_PATTERNS) {
+    for (const match of line.matchAll(pattern)) {
+      const value = match[group]
+      if (!value || PLACEHOLDER.test(value)) continue
+      if (looksReal && !looksReal(value)) continue
+      redacted = redacted.split(value).join(maskSecret(value))
+      if (!labels.includes(label)) labels.push(label)
+      if (severity !== 'high') severity = patternSeverity
+    }
+  }
+
+  return { redacted, labels, severity }
+}
+
+/**
+ * Mask every credential the secrets check would report. Any text quoted from
+ * an audited file goes through this before it reaches a finding, so a token
+ * on a line flagged for another reason is not printed in plaintext.
+ */
+export function redactSecrets(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => scanLine(line).redacted)
+    .join('\n')
 }
 
 export function checkSecrets(filePath: string, content: string): ContextIssue[] {
   const issues: ContextIssue[] = []
 
   content.split('\n').forEach((line, idx) => {
-    let redactedLine = line
-    const labels: string[] = []
-    let severity: Severity | null = null
-
-    for (const {
-      label,
-      pattern,
-      severity: patternSeverity,
-      group = 0,
-      looksReal,
-    } of SECRET_PATTERNS) {
-      for (const match of line.matchAll(pattern)) {
-        const value = match[group]
-        if (!value || PLACEHOLDER.test(value)) continue
-        if (looksReal && !looksReal(value)) continue
-        redactedLine = redactedLine.split(value).join(redact(value))
-        if (!labels.includes(label)) labels.push(label)
-        if (severity !== 'high') severity = patternSeverity
-      }
-    }
-
+    const { redacted: redactedLine, labels, severity } = scanLine(line)
     if (severity === null) return
 
     issues.push({

@@ -8,7 +8,7 @@ import { toJsonReport } from './report/jsonReport.js'
 import { toMarkdownReport } from './report/markdownReport.js'
 import { writeReport } from './fs/writeReport.js'
 import { OutputPathError, resolveOutputPath } from './fs/resolveOutputPath.js'
-import { isWithin } from './fs/safePath.js'
+import { isRealpathWithin } from './fs/safePath.js'
 import { toDisplayText } from './text/displayText.js'
 import { loadConfig } from './config/loadConfig.js'
 import { initRepo } from './init/initRepo.js'
@@ -152,7 +152,7 @@ program
       let resolvedRepo = path.resolve(cliRepoPath ?? process.cwd())
       if (!cliRepoPath && config?.audit?.repoPath) {
         resolvedRepo = path.resolve(configSearchDir, config.audit.repoPath)
-        if (!isWithin(configSearchDir, resolvedRepo)) {
+        if (!isRealpathWithin(configSearchDir, resolvedRepo)) {
           fail(`Config error: audit.repoPath must stay inside ${configSearchDir}`)
         }
       }
@@ -184,7 +184,7 @@ program
         baselinePath = path.resolve(opts.baseline)
       } else if (config?.audit?.baseline) {
         baselinePath = path.resolve(resolvedRepo, config.audit.baseline)
-        if (!isWithin(resolvedRepo, baselinePath)) {
+        if (!isRealpathWithin(resolvedRepo, baselinePath)) {
           fail(`Config error: audit.baseline must stay inside ${resolvedRepo}`)
         }
       }

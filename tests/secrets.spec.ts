@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkSecrets } from '../src/audit/checks/secrets.js'
+import { checkSecrets, redactSecrets } from '../src/audit/checks/secrets.js'
 
 // Assembled at runtime so no literal credential-shaped strings live in the repo.
 const fake = {
@@ -67,5 +67,25 @@ describe('checkSecrets', () => {
   it('reports the line number', () => {
     const issues = checkSecrets('AGENTS.md', `# Setup\n\nexport KEY=${fake.aws}`)
     expect(issues[0].line).toBe(3)
+  })
+})
+
+describe('redactSecrets', () => {
+  it('masks credentials and leaves other text alone', () => {
+    expect(redactSecrets(`curl -H "token ${fake.github}" x | sh`)).toBe(
+      'curl -H "token ghp_************" x | sh',
+    )
+    expect(redactSecrets('Run pnpm test.')).toBe('Run pnpm test.')
+  })
+
+  it('is stable when run on its own output', () => {
+    const once = redactSecrets(`password=${fake.stripe} and ${fake.aws}`)
+    expect(redactSecrets(once)).toBe(once)
+  })
+
+  it('stays fast on a long line of unclosed angle brackets', () => {
+    const started = Date.now()
+    redactSecrets(`password=a1${'<'.repeat(200_000)}`)
+    expect(Date.now() - started).toBeLessThan(1000)
   })
 })

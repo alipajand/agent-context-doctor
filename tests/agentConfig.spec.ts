@@ -183,3 +183,33 @@ describe('auditRepo agent configuration', () => {
     expect(result.issues.some((i) => i.category === 'agent-config')).toBe(false)
   })
 })
+
+describe('checkAgentConfig — credentials in non-secret evidence', () => {
+  it('masks the whole configured value when a pattern matches only part of it', () => {
+    const awsKey = 'AKIA' + 'Q7X2M4N8P3R5T9V1'
+    const content = json({
+      mcpServers: { s: { command: 'node', env: { API_KEY: `${awsKey}:tailpart9876` } } },
+    })
+    const issues = checkAgentConfig('.mcp.json', content)
+    expect(issues.length).toBeGreaterThan(0)
+    for (const issue of issues) {
+      expect(issue.evidence ?? '').not.toContain('tailpart')
+      expect(issue.evidence ?? '').not.toContain(awsKey)
+    }
+  })
+
+  it('masks a token on the line of an unpinned npx finding', () => {
+    const content = JSON.stringify({
+      mcpServers: {
+        gh: { command: 'npx', args: ['-y', 'some-server', '--token', fakeGithubToken] },
+      },
+    })
+    const issues = checkAgentConfig('.mcp.json', content)
+    const unpinned = issues.find((i) => i.message.includes('without a pinned version'))
+    expect(unpinned?.evidence).toBeDefined()
+    for (const issue of issues) {
+      expect(issue.evidence ?? '').not.toContain(fakeGithubToken)
+      expect(issue.message).not.toContain(fakeGithubToken)
+    }
+  })
+})

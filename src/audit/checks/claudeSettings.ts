@@ -1,5 +1,6 @@
 import type { Severity } from '../../types.js'
 import { findShellRisks } from './shellRisk.js'
+import { redactSecrets } from './secrets.js'
 
 export type ConfigFinding = {
   severity: Severity
@@ -260,7 +261,7 @@ export type SettingsCommand = { source: string; command: string }
 
 /** Shorten repository-provided text quoted in a message. */
 export function clip(text: string, max = 80): string {
-  const flat = text.replace(/\s+/g, ' ').trim()
+  const flat = redactSecrets(text).replace(/\s+/g, ' ').trim()
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat
 }
 

@@ -15,7 +15,7 @@ import {
 import { checkContradictions } from './checks/contradictions.js'
 import { checkSkippedFile } from './checks/skippedFiles.js'
 import { checkHiddenCharacters } from './checks/hiddenCharacters.js'
-import { checkSecrets } from './checks/secrets.js'
+import { checkSecrets, redactSecrets } from './checks/secrets.js'
 import { fingerprintIssue } from './baseline.js'
 import { checkBrokenReferences, extractFileReferences } from './checks/brokenReferences.js'
 import { parseGitignore, type GitignoreMatcher } from './gitignore.js'
@@ -384,6 +384,10 @@ export async function auditRepo(repoPath: string, opts: AuditOptions = {}): Prom
   const low = issues.filter((i) => i.severity === 'low').length
 
   for (const issue of issues) {
+    // Checks mask what they quote; this catches any text quoted some other way.
+    issue.message = redactSecrets(issue.message)
+    issue.recommendation = redactSecrets(issue.recommendation)
+    if (issue.evidence !== undefined) issue.evidence = redactSecrets(issue.evidence)
     issue.fingerprint = fingerprintIssue(issue)
   }
 
