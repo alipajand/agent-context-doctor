@@ -83,6 +83,42 @@ describe('redactSecrets', () => {
     expect(redactSecrets(once)).toBe(once)
   })
 
+  // Distinct GitHub-shaped tokens, assembled at runtime.
+  const tokens = (count: number) =>
+    Array.from(
+      { length: count },
+      (_, i) => 'ghp' + '_' + i.toString(36).padStart(8, '0') + 'Qz'.repeat(14),
+    )
+
+  it('masks each credential the same way up to the per-line limit', () => {
+    const line = `Use ${tokens(64).join(' and ')} here.`
+    const masked = redactSecrets(line)
+    expect(masked.startsWith('Use ghp_************ and ')).toBe(true)
+    expect(masked.endsWith(' here.')).toBe(true)
+    expect(masked).not.toContain('Qz')
+  })
+
+  it('past the limit, masks every long word, keeping less of each credential', () => {
+    const many = tokens(65)
+    const masked = redactSecrets(`Use ${many.join(' ')} now.`)
+    expect(masked).not.toContain('Qz')
+    expect(masked).toContain('Use ghp_************ ')
+    expect(masked.endsWith(' now.')).toBe(true)
+    expect(redactSecrets(`instructions ${many.join(' ')}`)).toMatch(/^inst\*{8} /)
+    const [issue] = checkSecrets('AGENTS.md', many.join(' '))
+    expect(issue.severity).toBe('high')
+    expect(issue.message).toContain('GitHub token')
+    expect(issue.evidence).not.toContain('Qz')
+  })
+
+  it('stays fast on a line with thousands of distinct credentials', () => {
+    const line = tokens(25_000).join(' ')
+    const started = Date.now()
+    const masked = redactSecrets(line)
+    expect(Date.now() - started).toBeLessThan(2000)
+    expect(masked).not.toContain('Qz')
+  })
+
   it('stays fast on a long line of unclosed angle brackets', () => {
     const started = Date.now()
     redactSecrets(`password=a1${'<'.repeat(200_000)}`)

@@ -64,8 +64,26 @@ export function maskSecret(value: string): string {
 
 type LineScan = { redacted: string; labels: string[]; severity: Severity | null }
 
+// Masking replaces every occurrence of each value across the whole line, one
+// pass per distinct value. A line with thousands of distinct credentials would
+// make that grow with the square of its length, so past this many the line is
+// masked word by word instead.
+export const MAX_VALUES_PER_LINE = 64
+
+// Every value that maskSecret hides part of is at least eight characters long
+// and contains no whitespace, so it lies inside a run of eight or more
+// non-space characters. Keeping only the first four characters of each such
+// run hides at least what masking the values one by one would.
+function maskEveryWord(line: string): string {
+  return line.replace(
+    /\S{8,}/g,
+    (word) => word.slice(0, 4) + '*'.repeat(Math.min(word.length - 4, 12)),
+  )
+}
+
 function scanLine(line: string): LineScan {
-  let redacted = line
+  // Insertion order is discovery order, which the masking below relies on.
+  const values = new Set<string>()
   const labels: string[] = []
   let severity: Severity | null = null
 
@@ -80,12 +98,17 @@ function scanLine(line: string): LineScan {
       const value = match[group]
       if (!value || PLACEHOLDER.test(value)) continue
       if (looksReal && !looksReal(value)) continue
-      redacted = redacted.split(value).join(maskSecret(value))
+      values.add(value)
       if (!labels.includes(label)) labels.push(label)
       if (severity !== 'high') severity = patternSeverity
     }
   }
 
+  if (values.size > MAX_VALUES_PER_LINE) {
+    return { redacted: maskEveryWord(line), labels, severity }
+  }
+  let redacted = line
+  for (const value of values) redacted = redacted.split(value).join(maskSecret(value))
   return { redacted, labels, severity }
 }
 

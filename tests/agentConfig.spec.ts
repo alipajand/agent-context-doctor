@@ -213,3 +213,31 @@ describe('checkAgentConfig — credentials in non-secret evidence', () => {
     }
   })
 })
+
+describe('checkAgentConfig — configured credentials on a shared line', () => {
+  // Matches no secrets pattern, so only the configured-credential masking hides it.
+  const configured = 'cfgval' + '7Q2w9E4r'
+
+  it('masks an env value in the evidence of every finding on its line', () => {
+    const content = JSON.stringify({
+      mcpServers: { s: { command: 'npx', args: ['pkg'], env: { API_TOKEN: configured } } },
+    })
+    const issues = checkAgentConfig('.mcp.json', content)
+    expect(issues.some((i) => i.message.includes('without a pinned version'))).toBe(true)
+    for (const issue of issues) expect(issue.evidence ?? '').not.toContain(configured)
+  })
+
+  it('stays fast on a one-line file with thousands of servers', () => {
+    const servers = Object.fromEntries(
+      Array.from({ length: 4000 }, (_, i) => [
+        `s${i}`,
+        { command: 'npx', args: ['pkg'], env: { API_TOKEN: `${configured}${i}` } },
+      ]),
+    )
+    const started = Date.now()
+    const issues = checkAgentConfig('.mcp.json', JSON.stringify({ mcpServers: servers }))
+    expect(Date.now() - started).toBeLessThan(5000)
+    expect(issues.length).toBe(8000)
+    for (const issue of issues) expect(issue.evidence ?? '').not.toContain(configured)
+  })
+})
