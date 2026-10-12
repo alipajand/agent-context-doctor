@@ -3,6 +3,7 @@ import { createLineContext, type LineContext } from '../lineContext.js'
 import { findSkipValidation } from '../skipValidation.js'
 import { isPrimaryInstructionFile } from '../detectContextFiles.js'
 import { toDisplayText } from '../../text/displayText.js'
+import { redactSecrets } from './secrets.js'
 
 type ContradictionGroup = {
   name: string
@@ -103,7 +104,7 @@ const MAX_PHRASE_LENGTH = 160
 // so they are shown the way line evidence is: one line, visible characters,
 // bounded length.
 function toPhrase(text: string): string {
-  return toDisplayText(text.replace(/\s+/g, ' ').trim()).slice(0, MAX_PHRASE_LENGTH)
+  return toDisplayText(redactSecrets(text).replace(/\s+/g, ' ').trim()).slice(0, MAX_PHRASE_LENGTH)
 }
 
 function findMatches(

@@ -1,6 +1,7 @@
 import type { ContextIssue, Severity } from '../../types.js'
 import { getLineEvidence } from '../evidence.js'
-import { formatCodePoint, isInvisibleCodePoint } from '../../text/displayText.js'
+import { formatCodePoint, isInvisibleCodePoint, toDisplayText } from '../../text/displayText.js'
+import { redactSecrets } from './secrets.js'
 
 const BOM = 0xfeff
 const ZWNJ = 0x200c
@@ -82,7 +83,7 @@ export function checkHiddenCharacters(filePath: string, content: string): Contex
 
     const list = [...finding.codePoints].join(', ')
     const hidden = finding.hiddenText
-      ? ` Hidden text: "${finding.hiddenText.replace(/\s+/g, ' ').trim().slice(0, 120)}"`
+      ? ` Hidden text: "${toDisplayText(redactSecrets(finding.hiddenText).replace(/\s+/g, ' ').trim()).slice(0, 120)}"`
       : ''
 
     issues.push({

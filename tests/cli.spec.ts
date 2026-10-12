@@ -307,6 +307,40 @@ describe('acd audit formats and gates', () => {
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('audit.baseline must stay inside')
   })
+
+  it('refuses an .acdrc baseline that links outside the repository', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-baseline-outside-'))
+    try {
+      await fs.writeFile(path.join(outside, 'credentials'), 'outside-file-content')
+      await fs.symlink(path.join(outside, 'credentials'), path.join(tmpDir, 'b.json'))
+      await fs.writeFile(
+        path.join(tmpDir, '.acdrc'),
+        JSON.stringify({ audit: { baseline: 'b.json' } }),
+      )
+      const result = runCli(['audit', tmpDir])
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('audit.baseline must stay inside')
+      expect(result.stderr).not.toContain('outside-file-content')
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses an .acdrc repoPath that links outside the config directory', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-repopath-outside-'))
+    try {
+      await fs.symlink(outside, path.join(tmpDir, 'linked'))
+      await fs.writeFile(
+        path.join(tmpDir, '.acdrc'),
+        JSON.stringify({ audit: { repoPath: 'linked' } }),
+      )
+      const result = runCli(['audit'], tmpDir)
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('audit.repoPath must stay inside')
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('acd checks', () => {

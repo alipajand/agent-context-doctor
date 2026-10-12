@@ -62,6 +62,18 @@ describe('fingerprintIssue', () => {
 })
 
 describe('loadBaseline', () => {
+  it('reports invalid JSON by position without quoting the file', async () => {
+    const file = path.join(tmpDir, 'baseline.json')
+    await fs.writeFile(file, 'aws_secret_access_key = abc123')
+    const error = await loadBaseline(file).then(
+      () => null,
+      (err: unknown) => err as Error,
+    )
+    expect(error).toBeInstanceOf(BaselineError)
+    expect(error?.message).toContain('not valid JSON')
+    expect(error?.message).not.toContain('aws_secret')
+  })
+
   it('reads fingerprints from a JSON report', async () => {
     const file = path.join(tmpDir, 'baseline.json')
     const known = { ...issue(), fingerprint: fingerprintIssue(issue()) }

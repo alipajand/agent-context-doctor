@@ -54,38 +54,81 @@ const SECRET_PATTERNS: SecretPattern[] = [
 
 // Values that are clearly documentation rather than real credentials.
 const PLACEHOLDER =
-  /example|sample|dummy|fake|placeholder|changeme|your[_-]|redacted|xxxx|\*{3}|<[^>]*>|\$\{|\$[A-Z_]|process\.env|environ|getenv|secrets\.|\{\{/i
+  /example|sample|dummy|fake|placeholder|changeme|your[_-]|redacted|xxxx|\*{3}|<[^<>]*>|\$\{|\$[A-Z_]|process\.env|environ|getenv|secrets\.|\{\{/i
 
-function redact(value: string): string {
+/** Mask a credential, keeping a short prefix so the finding can be located. */
+export function maskSecret(value: string): string {
   const visible = value.startsWith('-----') ? value.length : Math.min(4, value.length)
   return value.slice(0, visible) + '*'.repeat(Math.max(0, Math.min(value.length - visible, 12)))
+}
+
+type LineScan = { redacted: string; labels: string[]; severity: Severity | null }
+
+// Masking replaces every occurrence of each value across the whole line, one
+// pass per distinct value. A line with thousands of distinct credentials would
+// make that grow with the square of its length, so past this many the line is
+// masked word by word instead.
+export const MAX_VALUES_PER_LINE = 64
+
+// Every value that maskSecret hides part of is at least eight characters long
+// and contains no whitespace, so it lies inside a run of eight or more
+// non-space characters. Keeping only the first four characters of each such
+// run hides at least what masking the values one by one would.
+function maskEveryWord(line: string): string {
+  return line.replace(
+    /\S{8,}/g,
+    (word) => word.slice(0, 4) + '*'.repeat(Math.min(word.length - 4, 12)),
+  )
+}
+
+function scanLine(line: string): LineScan {
+  // Insertion order is discovery order, which the masking below relies on.
+  const values = new Set<string>()
+  const labels: string[] = []
+  let severity: Severity | null = null
+
+  for (const {
+    label,
+    pattern,
+    severity: patternSeverity,
+    group = 0,
+    looksReal,
+  } of SECRET_PATTERNS) {
+    for (const match of line.matchAll(pattern)) {
+      const value = match[group]
+      if (!value || PLACEHOLDER.test(value)) continue
+      if (looksReal && !looksReal(value)) continue
+      values.add(value)
+      if (!labels.includes(label)) labels.push(label)
+      if (severity !== 'high') severity = patternSeverity
+    }
+  }
+
+  if (values.size > MAX_VALUES_PER_LINE) {
+    return { redacted: maskEveryWord(line), labels, severity }
+  }
+  let redacted = line
+  for (const value of values) redacted = redacted.split(value).join(maskSecret(value))
+  return { redacted, labels, severity }
+}
+
+/**
+ * Mask every credential the secrets check would report. Any text quoted from
+ * an audited file goes through this before it reaches a finding, so a token
+ * on a line flagged for another reason is not printed in plaintext.
+ */
+export function redactSecrets(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => scanLine(line).redacted)
+    .join('\n')
 }
 
 export function checkSecrets(filePath: string, content: string): ContextIssue[] {
   const issues: ContextIssue[] = []
 
   content.split('\n').forEach((line, idx) => {
-    let redactedLine = line
-    const labels: string[] = []
-    let severity: Severity | null = null
-
-    for (const {
-      label,
-      pattern,
-      severity: patternSeverity,
-      group = 0,
-      looksReal,
-    } of SECRET_PATTERNS) {
-      for (const match of line.matchAll(pattern)) {
-        const value = match[group]
-        if (!value || PLACEHOLDER.test(value)) continue
-        if (looksReal && !looksReal(value)) continue
-        redactedLine = redactedLine.split(value).join(redact(value))
-        if (!labels.includes(label)) labels.push(label)
-        if (severity !== 'high') severity = patternSeverity
-      }
-    }
-
+    const { redacted: redactedLine, labels, severity } = scanLine(line)
     if (severity === null) return
 
     issues.push({

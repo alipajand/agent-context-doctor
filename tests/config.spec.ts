@@ -217,3 +217,65 @@ describe('allowedMissingScripts', () => {
     expect(result.issues.some((i) => i.message.includes('release'))).toBe(true)
   })
 })
+
+describe('loadConfig — symlinked .acdrc', () => {
+  let outsideDir: string
+
+  beforeEach(async () => {
+    outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), 'acd-config-outside-'))
+  })
+
+  afterEach(async () => {
+    await fs.rm(outsideDir, { recursive: true, force: true })
+  })
+
+  it('refuses a link that resolves outside the directory without quoting the target', async () => {
+    const target = path.join(outsideDir, '.npmrc')
+    await fs.writeFile(target, '//registry.npmjs.org/:_authToken=outside-secret-value\n')
+    await fs.symlink(target, path.join(tmpDir, '.acdrc'))
+
+    const error = await loadConfig(tmpDir).then(
+      () => null,
+      (err: unknown) => err as Error,
+    )
+    expect(error?.message).toContain('links outside')
+    expect(error?.message).not.toContain('registry')
+    expect(error?.message).not.toContain('outside-secret-value')
+  })
+
+  it('does not apply a valid JSON file linked from outside', async () => {
+    const target = path.join(outsideDir, 'config.json')
+    await fs.writeFile(target, JSON.stringify({ audit: { failOn: 'high' } }))
+    await fs.symlink(target, path.join(tmpDir, '.acdrc'))
+    await expect(loadConfig(tmpDir)).rejects.toThrow('links outside')
+  })
+
+  it('still loads a link to a file inside the directory', async () => {
+    await fs.mkdir(path.join(tmpDir, 'config'))
+    await fs.writeFile(
+      path.join(tmpDir, 'config', 'acd.json'),
+      JSON.stringify({ audit: { failOn: 'medium' } }),
+    )
+    await fs.symlink(path.join('config', 'acd.json'), path.join(tmpDir, '.acdrc'))
+    const config = await loadConfig(tmpDir)
+    expect(config?.audit?.failOn).toBe('medium')
+  })
+
+  it('treats a dangling link as no config', async () => {
+    await fs.symlink(path.join(outsideDir, 'missing.json'), path.join(tmpDir, '.acdrc'))
+    await expect(loadConfig(tmpDir)).resolves.toBeNull()
+  })
+})
+
+describe('loadConfig — parse errors', () => {
+  it('reports the position without quoting file content', async () => {
+    await fs.writeFile(path.join(tmpDir, '.acdrc'), '{\n  "audit": tokenvalue123\n}')
+    const error = await loadConfig(tmpDir).then(
+      () => null,
+      (err: unknown) => err as Error,
+    )
+    expect(error?.message).toContain('not valid JSON')
+    expect(error?.message).not.toContain('tokenvalue')
+    expect(error?.message).not.toContain('audit')
+  })
+})

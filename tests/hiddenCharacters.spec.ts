@@ -64,3 +64,14 @@ describe('checkHiddenCharacters', () => {
     expect(checkHiddenCharacters('AGENTS.md', `deploy${ZWJ}now`)).toHaveLength(1)
   })
 })
+
+describe('checkHiddenCharacters — credentials in hidden text', () => {
+  // Assembled at runtime so no credential-shaped literal is committed.
+  const token = 'ghp' + '_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8'
+
+  it('masks a token before shortening the hidden text', () => {
+    const content = `Style guide.${tags(`${'x'.repeat(100)} ${token}`)}`
+    const [issue] = checkHiddenCharacters('AGENTS.md', content)
+    expect(issue.message).not.toContain(token.slice(0, 12))
+  })
+})

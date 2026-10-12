@@ -177,9 +177,8 @@ function mcpServerFindings(name: string, server: Record<string, unknown>): Findi
 
 // The quoted JSON form finds the value itself: a bare "~" would also match
 // "Edit(~/.zshrc)" on an earlier line.
-function lineOf(content: string, needle: string | undefined): number | undefined {
+function lineOf(lines: string[], needle: string | undefined): number | undefined {
   if (!needle) return undefined
-  const lines = content.split('\n')
   for (const form of [JSON.stringify(needle), needle]) {
     const idx = lines.findIndex((line) => line.includes(form))
     if (idx !== -1) return idx + 1
@@ -224,8 +223,36 @@ export function checkAgentConfig(filePath: string, content: string): ContextIssu
     if (server) findings.push(...mcpServerFindings(name, server))
   }
 
+  const lines = content.split('\n')
+
+  // Every finding quoting a line masks the whole of each credential configured
+  // on it, not only the part a pattern recognized: in a compact file the
+  // unpinned-npx finding quotes the same line as the server's env values.
+  const credentialMasks = new Map<number, string[]>()
+  for (const finding of findings) {
+    const line = finding.secret === true ? lineOf(lines, finding.needle) : undefined
+    if (line === undefined) continue
+    credentialMasks.set(line, [
+      ...(credentialMasks.get(line) ?? []),
+      ...credentialForms(finding.needle),
+    ])
+  }
+  // Built once per line: many findings can quote the same long line.
+  const evidenceByLine = new Map<number, string>()
+  const evidenceAt = (line: number): string => {
+    let evidence = evidenceByLine.get(line)
+    if (evidence === undefined) {
+      evidence = getLineEvidence(content, line, credentialMasks.get(line))
+      evidenceByLine.set(line, evidence)
+    }
+    return evidence
+  }
+
   const secretIssues = checkSecrets(filePath, content).map((issue) => ({
     ...issue,
+    ...(issue.line !== undefined && credentialMasks.has(issue.line)
+      ? { evidence: evidenceAt(issue.line) }
+      : {}),
     id: issue.id.replace(/^secrets-/, 'agent-config-secret-'),
     category: 'agent-config',
     message: `${issue.message.replace(' in an agent instruction file', '')} in agent configuration`,
@@ -236,17 +263,14 @@ export function checkAgentConfig(filePath: string, content: string): ContextIssu
   const secretLines = new Set(secretIssues.map((i) => i.line))
   const issues: ContextIssue[] = []
   findings.forEach((finding, i) => {
-    const line = lineOf(content, finding.needle)
-    const isCredential = finding.secret === true
-    if (isCredential && line !== undefined && secretLines.has(line)) return
+    const line = lineOf(lines, finding.needle)
+    if (finding.secret === true && line !== undefined && secretLines.has(line)) return
     issues.push({
       id: `agent-config-${filePath}-${i}`,
       severity: finding.severity,
       category: 'agent-config',
       file: filePath,
-      ...(line
-        ? { line, evidence: evidenceFor(content, line, isCredential ? finding.needle : undefined) }
-        : {}),
+      ...(line ? { line, evidence: evidenceAt(line) } : {}),
       message: finding.message,
       recommendation: finding.recommendation,
     })
@@ -255,12 +279,9 @@ export function checkAgentConfig(filePath: string, content: string): ContextIssu
   return [...issues, ...secretIssues]
 }
 
-// Evidence for a credential finding must not repeat the value.
-function evidenceFor(content: string, line: number, secret: string | undefined): string {
-  const evidence = getLineEvidence(content, line)
-  if (!secret) return evidence
-  const masked = `${secret.slice(0, 4)}${'*'.repeat(Math.min(12, Math.max(0, secret.length - 4)))}`
-  return evidence.split(secret).join(masked)
+// The value may appear JSON-escaped on the line, so both spellings are masked.
+function credentialForms(value: string | undefined): string[] {
+  return value ? [value, JSON.stringify(value).slice(1, -1)] : []
 }
 
 /** Repository scripts that `.claude/settings.json` runs from hooks or the status line. */

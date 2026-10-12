@@ -1,13 +1,35 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { MAX_TEXT_FILE_BYTES, readRegularFile } from '../fs/readTextFile.js'
+import { isWithin } from '../fs/safePath.js'
+import { describeJsonError } from '../text/jsonError.js'
 import { AcdRcSchema } from './schema.js'
 import type { AcdRc } from './schema.js'
+
+function isMissing(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | null)?.code
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
 
 export async function loadConfig(searchDir: string): Promise<AcdRc | null> {
   const configPath = path.join(searchDir, '.acdrc')
 
-  const read = await readRegularFile(configPath, MAX_TEXT_FILE_BYTES)
-  // No .acdrc present — not an error
+  // `.acdrc` comes from the audited repository, so a symlink must not let it
+  // read a file elsewhere on disk, the same as context files.
+  let realConfig: string
+  try {
+    realConfig = await fs.realpath(configPath)
+  } catch (err) {
+    // No .acdrc present (or a dangling link) — not an error
+    if (isMissing(err)) return null
+    throw err
+  }
+  const realDir = await fs.realpath(searchDir).catch(() => path.resolve(searchDir))
+  if (!isWithin(realDir, realConfig)) {
+    throw new Error(`.acdrc at ${configPath} links outside ${searchDir}; refusing to read it`)
+  }
+
+  const read = await readRegularFile(realConfig, MAX_TEXT_FILE_BYTES)
   if (read.status === 'missing') return null
   if (read.status === 'error') throw read.error
   if (read.status === 'not-a-file') {
@@ -22,9 +44,7 @@ export async function loadConfig(searchDir: string): Promise<AcdRc | null> {
   try {
     parsed = JSON.parse(raw)
   } catch (err) {
-    throw new Error(
-      `.acdrc at ${configPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-    )
+    throw new Error(`.acdrc at ${configPath} ${describeJsonError(raw, err)}`)
   }
 
   const result = AcdRcSchema.safeParse(parsed)

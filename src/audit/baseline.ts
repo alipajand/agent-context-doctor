@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readTextFile } from '../fs/readTextFile.js'
+import { describeJsonError } from '../text/jsonError.js'
 import type { AuditResult, ContextIssue } from '../types.js'
 
 /**
@@ -44,9 +45,7 @@ export async function loadBaseline(filePath: string): Promise<Set<string>> {
   try {
     parsed = JSON.parse(raw)
   } catch (err) {
-    throw new BaselineError(
-      `Baseline ${filePath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
-    )
+    throw new BaselineError(`Baseline ${filePath} ${describeJsonError(raw, err)}`)
   }
 
   const issues = (parsed as { issues?: unknown } | null)?.issues
