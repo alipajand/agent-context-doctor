@@ -62,11 +62,25 @@ Every run produces a 0–100 score: start at 100, subtract **20** per high issue
 
 ## Quick start
 
-`acd` is not published to npm yet. **The npm package named `agent-context-doctor` is an unrelated project.** Installing it does not give you this tool, and it runs someone else's code. Install a release from GitHub instead; npm builds the CLI during install:
+`acd` is not published to npm yet. **The npm package named `agent-context-doctor` is an unrelated project.** Installing it does not give you this tool, and it runs someone else's code. Run a release from GitHub instead; npm builds the CLI when it fetches it. Pin the release's commit SHA, because tags can be moved. `08559610d7c5d721718004767c0a8588f014edda` is `v1.0.0`:
 
 ```bash
-npm install -g github:alipajand/agent-context-doctor#v1.0.0
+# Works on npm 11 and npm 12
+npx --yes --allow-git=all \
+  --package=github:alipajand/agent-context-doctor#08559610d7c5d721718004767c0a8588f014edda \
+  -- acd audit
 ```
+
+- `--allow-git=all` is required on npm 12, which refuses packages fetched from git by default (`EALLOWGIT: Fetching packages of type "git" have been disabled`). npm 11 accepts the flag too. Use npm 11 or later (Node 24 ships npm 11): npm 10, the default on Node 22, exits with code 1 and no message when `npx` runs a package from git.
+- Prefer `npx` to `npm install -g`. On npm 11, a global install from git fails while building the CLI: npm runs the `prepare` build as another global install, so TypeScript is never installed and the build stops with `tsc: command not found`. On npm 12, `npm install -g --allow-git=all github:alipajand/agent-context-doctor#08559610d7c5d721718004767c0a8588f014edda` works.
+- To add it to a project with pnpm, run `pnpm add -D github:alipajand/agent-context-doctor#08559610d7c5d721718004767c0a8588f014edda`. pnpm 11 and later skip the build of a git package until you allow it in `pnpm-workspace.yaml`, so add the entry pnpm prints:
+
+  ```yaml
+  allowBuilds:
+    "agent-context-doctor@https://codeload.github.com/alipajand/agent-context-doctor/tar.gz/08559610d7c5d721718004767c0a8588f014edda": true
+  ```
+
+The examples below call `acd` directly; with `npx`, put the `npx … --` prefix above in front of them.
 
 Or run from source:
 
@@ -321,9 +335,10 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
-      # v1.0.0 is a release tag. Tags can be moved, so pin its commit SHA for an exact version.
-      - run: npx --yes --package=github:alipajand/agent-context-doctor#v1.0.0 acd audit --fail-on high
+          node-version: 24
+      # 08559610d7c5d721718004767c0a8588f014edda is v1.0.0. Pin the commit SHA: tags can be moved.
+      # --allow-git=all is required on npm 12, which refuses git packages by default.
+      - run: npx --yes --allow-git=all --package=github:alipajand/agent-context-doctor#08559610d7c5d721718004767c0a8588f014edda -- acd audit --fail-on high
 ```
 
 To produce a report artifact, add `--output docs/agent-context-report.md` (and `--json` if you also want machine-readable output).
@@ -333,7 +348,7 @@ To produce a report artifact, add `--output docs/agent-context-report.md` (and `
 `--format github` prints workflow annotations, so findings show up on the pull request diff:
 
 ```yaml
-      - run: npx --yes --package=github:alipajand/agent-context-doctor#v1.0.0 acd audit --format github --fail-on high
+      - run: npx --yes --allow-git=all --package=github:alipajand/agent-context-doctor#08559610d7c5d721718004767c0a8588f014edda -- acd audit --format github --fail-on high
 ```
 
 `--format sarif` prints SARIF 2.1.0 for GitHub code scanning:
@@ -344,7 +359,7 @@ To produce a report artifact, add `--output docs/agent-context-report.md` (and `
       security-events: write
     steps:
       # ... checkout and setup-node as above ...
-      - run: npx --yes --package=github:alipajand/agent-context-doctor#v1.0.0 acd audit --format sarif > acd.sarif
+      - run: npx --yes --allow-git=all --package=github:alipajand/agent-context-doctor#08559610d7c5d721718004767c0a8588f014edda -- acd audit --format sarif > acd.sarif
       - uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: acd.sarif
